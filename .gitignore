@@ -1,9 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambiente Virtual
+printer_monitor/venv/
+venv/
+.venv/
+ENV/
+env/
+
+# Arquivos de Sistema
+.DS_Store
 
 BambuData.txt
 data.json
 node_modules/*
 package-lock.json
-.DS_Store
 config.json
 note.json
 accessToken.json

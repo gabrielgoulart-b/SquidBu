@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Impressora Bambu</title>
+    <!-- O CSS está embutido na tag <style> abaixo -->
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        h1, h2 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin-top: 30px; }
+        .status-grid, .ams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px; }
+        .status-item, .ams-unit, .ams-tray { background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        .status-item strong { display: block; margin-bottom: 5px; color: #555; font-size: 0.9em; }
+        .status-value { font-size: 1.1em; font-weight: bold; }
+        #error-message { color: #e74c3c; background-color: #fdd; border: 1px solid #e74c3c; padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 15px; text-align: center; }
+        .progress-bar-container { width: 100%; background-color: #e0e0e0; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .progress-bar { height: 24px; background-color: #4CAF50; width: 0%; border-radius: 4px; text-align: center; line-height: 24px; color: white; font-weight: bold; transition: width 0.5s ease-in-out; white-space: nowrap; }
+        .ams-unit h3, .ams-tray h4 { margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .filament-color { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px; vertical-align: middle; border: 1px solid #555; }
+        .ams-tray p { margin: 5px 0; }
+        .loading { text-align: center; padding: 20px; color: #777; }
+        .label { font-weight: normal; color: #666; }
+        .value { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Status da Impressora Bambu Lab</h1>
+        <div id="error-message" style="display: none;"></div>
+
+        <h2>Visão Geral</h2>
+        <div id="status-overview" class="status-grid">
+            <div class="loading">Carregando...</div>
+        </div>
+
+        <h2>Progresso da Impressão</h2>
+        <div id="status-progress" class="status-grid">
+             <div class="loading">Carregando...</div>
+        </div>
+        <div id="progress-bar-section" style="margin-top: 15px;"></div>
+
+        <h2>Temperaturas & Ventoinhas</h2>
+        <div id="status-temps-fans" class="status-grid">
+             <div class="loading">Carregando...</div>
+        </div>
+
+        <h2>AMS</h2>
+        <div id="ams-data" class="ams-grid">
+             <div class="loading">Carregando...</div>
+        </div>
+
+    </div>
+
+    <script>
+        const overviewDiv = document.getElementById('status-overview');
+        const progressDiv = document.getElementById('status-progress');
+        const progressBarSection = document.getElementById('progress-bar-section');
+        const tempsFansDiv = document.getElementById('status-temps-fans');
+        const amsDiv = document.getElementById('ams-data');
+        const errorDiv = document.getElementById('error-message');
+
+        function hexToRgb(hex) {
+            if (!hex || hex.length < 6) return 'rgb(200, 200, 200)'; // Cor padrão para inválido/ausente
+            const bigint = parseInt(hex.startsWith('#') ? hex.substring(1, 7) : hex.substring(0, 6), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function formatTime(minutes) {
+            if (minutes === undefined || minutes === null || minutes <= 0) return 'N/A';
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            let timeString = '';
+            if (h > 0) timeString += `${h}h `;
+            timeString += `${m}min`;
+            return timeString;
+        }
+
+        function createStatusItem(label, value, unit = '') {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'status-item';
+            itemDiv.innerHTML = `<strong>${label}</strong><span class="status-value">${value !== undefined && value !== null ? value : 'N/A'}${unit}</span>`;
+            return itemDiv;
+        }
+
+        function updateStatus() {
+            fetch('/status')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro HTTP ${response.status} ao buscar /status`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    errorDiv.style.display = 'none'; // Esconde erro se sucesso
+
+                    // Limpa seções antes de preencher
+                    overviewDiv.innerHTML = '';
+                    progressDiv.innerHTML = '';
+                    progressBarSection.innerHTML = '';
+                    tempsFansDiv.innerHTML = '';
+                    amsDiv.innerHTML = '';
+
+                    if (Object.keys(data).length === 0 || !data.print) {
+                        overviewDiv.innerHTML = '<div class="loading">Aguardando dados da impressora...</div>';
+                        // Manter as outras seções com 'Carregando' ou vazias
+                        progressDiv.innerHTML = '<div class="loading">Carregando...</div>';
+                        tempsFansDiv.innerHTML = '<div class="loading">Carregando...</div>';
+                        amsDiv.innerHTML = '<div class="loading">Carregando...</div>';
+                        return;
+                    }
+
+                    const printData = data.print;
+
+                    // --- Visão Geral ---
+                    overviewDiv.appendChild(createStatusItem('Estado', printData.gcode_state));
+                    overviewDiv.appendChild(createStatusItem('Sinal Wi-Fi', printData.wifi_signal));
+                    // Adicione mais itens gerais aqui se desejar
+
+                    // --- Progresso da Impressão ---
+                    const gcodeFile = printData.gcode_file || 'Nenhum';
+                    const percent = printData.mc_percent !== undefined ? printData.mc_percent : 0;
+                    const remainingMinutes = printData.mc_remaining_time;
+                    const layerNum = printData.layer_num || 0;
+                    const totalLayerNum = printData.total_layer_num || 0;
+
+                    progressDiv.appendChild(createStatusItem('Arquivo G-code', gcodeFile));
+                    progressDiv.appendChild(createStatusItem('Camada', `${layerNum} / ${totalLayerNum}`));
+                    progressDiv.appendChild(createStatusItem('Tempo Restante', formatTime(remainingMinutes)));
+
+                    // Barra de Progresso
+                    const progressBarContainer = document.createElement('div');
+                    progressBarContainer.className = 'progress-bar-container';
+                    const progressBar = document.createElement('div');
+                    progressBar.className = 'progress-bar';
+                    progressBar.style.width = `${percent}%`;
+                    progressBar.textContent = `${percent}%`;
+                    progressBarContainer.appendChild(progressBar);
+                    progressBarSection.appendChild(progressBarContainer);
+
+                    // --- Temperaturas & Ventoinhas ---
+                    tempsFansDiv.appendChild(createStatusItem('Bico', `${printData.nozzle_temper?.toFixed(1)} / ${printData.nozzle_target_temper?.toFixed(1)}`, ' °C'));
+                    tempsFansDiv.appendChild(createStatusItem('Mesa', `${printData.bed_temper?.toFixed(1)} / ${printData.bed_target_temper?.toFixed(1)}`, ' °C'));
+                    if (printData.chamber_temper !== undefined) {
+                         tempsFansDiv.appendChild(createStatusItem('Câmara', printData.chamber_temper?.toFixed(1), ' °C'));
+                    }
+                    tempsFansDiv.appendChild(createStatusItem('Vent. Peça', printData.cooling_fan_speed, '%'));
+                    tempsFansDiv.appendChild(createStatusItem('Vent. Auxiliar', printData.big_fan1_speed, '%'));
+                    tempsFansDiv.appendChild(createStatusItem('Vent. Câmara', printData.big_fan2_speed, '%'));
+
+                    // --- Dados do AMS ---
+                    if (printData.ams && printData.ams.ams && printData.ams.ams.length > 0) {
+                        printData.ams.ams.forEach((amsUnit, amsIndex) => {
+                            const unitDiv = document.createElement('div');
+                            unitDiv.className = 'ams-unit';
+                            unitDiv.innerHTML = `<h3>AMS ${amsIndex + 1} <span class="label">(Temp: ${amsUnit.temp || 'N/A'}°C, Umid: ${amsUnit.humidity || 'N/A'})</span></h3>`;
+
+                            if (amsUnit.tray && amsUnit.tray.length > 0) {
+                                amsUnit.tray.forEach(tray => {
+                                    // Verifica se a bandeja tem dados de filamento (cols ou type)
+                                    if (!tray.cols && !tray.tray_type) return;
+
+                                    const trayDiv = document.createElement('div');
+                                    trayDiv.className = 'ams-tray';
+                                    const trayId = tray.id !== undefined ? parseInt(tray.id) : -1;
+                                    trayDiv.innerHTML = `<h4>Bandeja ${trayId >= 0 ? trayId + 1 : '?'}</h4>`;
+
+                                    const colorHex = tray.tray_color || 'FFFFFF00'; // Usa branco transparente como padrão
+                                    const colorRgb = hexToRgb(colorHex);
+
+                                    const filamentInfo = document.createElement('p');
+                                    const colorSpan = document.createElement('span');
+                                    colorSpan.className = 'filament-color';
+                                    colorSpan.style.backgroundColor = colorRgb;
+                                    filamentInfo.appendChild(colorSpan);
+
+                                    const type = tray.tray_type || 'Desconhecido';
+                                    const profile = tray.tray_info_idx ? `(${tray.tray_info_idx})` : '';
+                                    const remaining = tray.remain !== undefined ? `${tray.remain}%` : 'N/A';
+
+                                    filamentInfo.appendChild(document.createTextNode(` ${type} ${profile}` ));
+                                    trayDiv.appendChild(filamentInfo);
+
+                                    const remainingInfo = document.createElement('p');
+                                    remainingInfo.innerHTML = `<span class="label">Restante:</span> <span class="value">${remaining}</span>`;
+                                    trayDiv.appendChild(remainingInfo);
+
+                                    unitDiv.appendChild(trayDiv);
+                                });
+                                // Se nenhuma bandeja com dados foi adicionada à unidade
+                                if (unitDiv.querySelectorAll('.ams-tray').length === 0) {
+                                     unitDiv.innerHTML += '<p>Nenhuma bandeja com filamento detectada nesta unidade.</p>';
+                                }
+                            } else {
+                                unitDiv.innerHTML += '<p>Nenhuma bandeja detectada nesta unidade.</p>';
+                            }
+                            amsDiv.appendChild(unitDiv);
+                        });
+                    } else {
+                        amsDiv.innerHTML = '<div class="loading">Nenhuma unidade AMS detectada ou sem dados.</div>';
+                    }
+
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar status:', error);
+                    // Limpa todas as seções e mostra o erro
+                    overviewDiv.innerHTML = '';
+                    progressDiv.innerHTML = '';
+                    progressBarSection.innerHTML = '';
+                    tempsFansDiv.innerHTML = '';
+                    amsDiv.innerHTML = '';
+                    errorDiv.textContent = `Falha ao conectar ao backend (${error.message}). Verifique se o script app.py está rodando e configurado corretamente.`;
+                    errorDiv.style.display = 'block';
+                });
+        }
+
+        // Atualiza o status imediatamente e depois a cada 3 segundos
+        updateStatus();
+        setInterval(updateStatus, 3000); // Atualiza a cada 3000ms (3 segundos)
+    </script>
+</body>
+</html> 
