@@ -594,69 +594,69 @@ function connectClient() {
       log(`Subscribed to topic: ${topic}`);
     });
 
-    const returnMsg = {
+    // Send initial pushall immediately on connect
+    const initialPushallMsg = {
       pushing: {
-        sequence_id: SequenceID,
+        sequence_id: SequenceID.toString(), // Ensure sequence_id is a string if needed by printer
         command: "pushall",
       },
-      user_id: "9586569",
+      user_id: "123456789", // Use a generic user ID
     };
+    client.publish(topicRequest, JSON.stringify(initialPushallMsg));
+    log("Sent initial pushall command.");
 
-    client.publish(topicRequest, JSON.stringify(returnMsg));
+    // Setup interval to send pushall periodically
+    const pushallInterval = setInterval(() => {
+      log("[Interval] Checking MQTT connection status..."); // Log entry into interval
+      if (client.connected) { // Only send if connected
+          log("[Interval] MQTT client is connected. Preparing pushall...");
+          SequenceID++;
+          const periodicPushallMsg = {
+              pushing: {
+                  sequence_id: SequenceID.toString(),
+                  command: "pushall",
+              },
+              user_id: "123456789",
+          };
+          try {
+            client.publish(topicRequest, JSON.stringify(periodicPushallMsg));
+            log("[Interval] Sent periodic pushall command successfully."); // Log success
+          } catch (publishError) {
+            console.error("[Interval] Error publishing periodic pushall:", publishError); // Log specific publish error
+          }
+      } else {
+          log("[Interval] Skipping periodic pushall, MQTT client not connected.");
+      }
+    }, 3000); // Send every 3 seconds
+
+    // Optional: Add handling to clear interval on MQTT close/error to prevent potential issues
+    const clearPushallInterval = () => {
+        log("Clearing periodic pushall interval.");
+        clearInterval(pushallInterval);
+    };
+    client.on('close', clearPushallInterval);
+    client.on('error', clearPushallInterval); // Also clear on error
+
   });
 
-  // Track the last execution time of the pushall command
-  let lastPushallTime = 0;
-  const PUSHALL_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
-  
   client.on("message", (topic, message) => {
     log(`Received message from topic: ${topic}`);
     try {
       const jsonData = JSON.parse(message.toString());
-      const dataToWrite = JSON.stringify(jsonData);
-      const lastUpdate = convertUtc(jsonData.t_utc);
-  
-      if (jsonData.print) {
-        // Write data to file
-        fs.writeFile("./public/data.json", dataToWrite, (err) => {
-          if (err) {
-            log("Error writing file:" + err);
-          } else {
-            log("Data written to file");
-          }
-        });
-      } else {
-        // Determine if we should send the pushall command
-        const printerModel = printerType || "X1"; // Default to X1
-        const currentTime = Date.now();
-  
-        if (
-          printerModel === "X1" || // For X1, always execute the command
-          (["P1P", "A1", "P1"].includes(printerModel) &&
-            currentTime - lastPushallTime >= PUSHALL_INTERVAL) // For P1 and A1, ensure interval has passed
-        ) {
-          const returnMsg = {
-            pushing: {
-              sequence_id: SequenceID,
-              command: "pushall",
-            },
-            user_id: "123456789",
-          };
-          client.publish(topicRequest, JSON.stringify(returnMsg));
-          lastPushallTime = currentTime; // Update the last execution time
-        } else if (["P1", "A1", "P1P"].includes(printerModel)) {
-          log(
-            `Skipping pushall command for ${printerModel}, waiting for the interval to pass.`
-          );
-        }
-      }
-    } catch (err) {
-      log("Error parsing JSON:" + err);
-      fs.writeFile("error.json", err, (err) => {
+      const dataToWrite = JSON.stringify(jsonData); // Keep the full message
+
+      // Always write the received valid JSON data to the file
+      fs.writeFile("./public/data.json", dataToWrite, (err) => {
         if (err) {
-          log("Error writing error file: " + err);
+          log("Error writing file:" + err);
+        } else {
+          log("Data written to file");
         }
       });
+
+    } catch (err) {
+      log("Error parsing JSON:" + err);
+      // Optional: Add error handling/logging if needed
     }
   });
 
@@ -710,3 +710,19 @@ function log(logText) {
     console.log(logText);
   }
 }
+
+// Route to provide settings to the frontend widgets
+app.get('/settings', (req, res) => {
+  // Read necessary settings from the loaded config or process.env
+  const settingsResponse = {
+    BambuBoard_tempSetting: tempSetting, // Use the variable loaded from config/env
+    BambuBoard_displayFanPercentages: displayFanPercentages,
+    BambuBoard_displayFanIcons: displayFanIcons
+    // Add other settings needed by the frontend here
+  };
+  res.json(settingsResponse);
+});
+
+app.get('/printer-camera-url', (req, res) => {
+  // ... existing code ...
+});

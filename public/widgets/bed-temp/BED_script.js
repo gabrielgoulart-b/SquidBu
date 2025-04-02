@@ -108,17 +108,13 @@ async function updateUI(telemetryObject) {
     }
 
     // Set target temp in UI
-    $("#bedTargetTempF").text(bedTargetTemp);
     $("#bedTargetTempC").text(telemetryObject.bed_target_temper);
 
     // Set current temp in UI
-    var bedCurrentTempF = Math.round((telemetryObject.bed_temper * 9) / 5 + 32);
-    $("#bedCurrentTempF").text(bedCurrentTempF);
-
     var bedCurrentTempC = Math.round(telemetryObject.bed_temper);
     $("#bedCurrentTempC").text(bedCurrentTempC);
 
-    log("bedCurrentTemp = " + bedCurrentTempF);
+    log("bedCurrentTemp = " + bedCurrentTempC);
     let progressBedParentWidth = $("#bedProgressBarParent").width();
 
     log("progressBedParentWidth = " + progressBedParentWidth);
@@ -128,48 +124,63 @@ async function updateUI(telemetryObject) {
 
     if (bedTargetTemp === "OFF") {
       $("#bedProgressBar").css("background-color", "grey");
-
-      $("#bedTargetTempC").hide();
+      // Hide all temperature symbols and values when OFF
       $("#bedTargetTempSymbolsF").hide();
+      $("#bedCurrentTempSymbolsF").hide();
+      $("#bedTargetTempF").hide();
+      $("#bedCurrentTempF").hide();
+      $("#bedCurrentTempC").hide();
       $("#bedTargetTempSymbolsC").hide();
+      $("#bedCurrentTempSymbolsC").hide();
+      $("#bedTargetTempC").hide();
     } else {
-      if (settings.BambuBoard_tempSetting === "Fahrenheit")
-      {
-        $("#bedTargetTempSymbolsF").show();
-        $("#bedCurrentTempSymbolsF").show();
-        $("#bedTargetTempF").show();
-        $("#bedCurrentTempF").show();
+      // ADD CHECK: Ensure settings are loaded before applying display logic
+      if (!settings || typeof settings.BambuBoard_tempSetting === 'undefined') {
+          log("Aguardando configurações de temperatura para a mesa...");
+          // Hide everything initially until settings load?
+          $("#bedTargetTempSymbolsF, #bedCurrentTempSymbolsF, #bedTargetTempF, #bedCurrentTempF").hide();
+          $("#bedCurrentTempC, #bedTargetTempSymbolsC, #bedCurrentTempSymbolsC, #bedTargetTempC").hide();
+      } else {
+          // Settings ARE loaded, apply original conditional logic
+          if (settings.BambuBoard_tempSetting === "Fahrenheit")
+          {
+            $("#bedTargetTempSymbolsF").show();
+            $("#bedCurrentTempSymbolsF").show();
+            $("#bedTargetTempF").show();
+            $("#bedCurrentTempF").show();
 
-        $("#bedCurrentTempC").hide();
-        $("#bedTargetTempSymbolsC").hide();
-        $("#bedCurrentTempSymbolsC").hide();
-        $("#bedTargetTempC").hide();
-      }
-      else if (settings.BambuBoard_tempSetting === "Celsius")
-      {
-        $("#bedTargetTempSymbolsF").hide();
-        $("#bedCurrentTempSymbolsF").hide();
-        $("#bedTargetTempF").hide();
-        $("#bedCurrentTempF").hide();
+            $("#bedCurrentTempC").hide();
+            $("#bedTargetTempSymbolsC").hide();
+            $("#bedCurrentTempSymbolsC").hide();
+            $("#bedTargetTempC").hide();
+          }
+          else if (settings.BambuBoard_tempSetting === "Celsius")
+          {
+            $("#bedTargetTempSymbolsF").hide();
+            $("#bedCurrentTempSymbolsF").hide();
+            $("#bedTargetTempF").hide();
+            $("#bedCurrentTempF").hide();
 
-        $("#bedCurrentTempC").show();
-        $("#bedTargetTempSymbolsC").show();
-        $("#bedCurrentTempSymbolsC").show();
-        $("#bedTargetTempC").show();
-      }
-      else if (settings.BambuBoard_tempSetting === "Both")
-      {
-        $("#bedTargetTempSymbolsF").show();
-        $("#bedCurrentTempSymbolsF").show();
-        $("#bedTargetTempF").show();
-        $("#bedCurrentTempF").show();
+            $("#bedCurrentTempC").show();
+            $("#bedTargetTempSymbolsC").show();
+            $("#bedCurrentTempSymbolsC").show();
+            $("#bedTargetTempC").show();
+          }
+          else if (settings.BambuBoard_tempSetting === "Both") // Default to Both if value is unexpected? Or handle error?
+          {
+            $("#bedTargetTempSymbolsF").show();
+            $("#bedCurrentTempSymbolsF").show();
+            $("#bedTargetTempF").show();
+            $("#bedCurrentTempF").show();
 
-        $("#bedCurrentTempC").show();
-        $("#bedTargetTempSymbolsC").show();
-        $("#bedCurrentTempSymbolsC").show();
-        $("#bedTargetTempC").show();
-      }
+            $("#bedCurrentTempC").show();
+            $("#bedTargetTempSymbolsC").show();
+            $("#bedCurrentTempSymbolsC").show();
+            $("#bedTargetTempC").show();
+          }
+      } // End of check for loaded settings
 
+      // Keep progress bar color logic
       if (bedTempPercentage > 80) {
         $("#bedProgressBar").css("background-color", "red");
       } else if (bedTempPercentage > 50) {

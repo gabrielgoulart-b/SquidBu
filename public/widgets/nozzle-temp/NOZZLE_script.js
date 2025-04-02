@@ -88,17 +88,13 @@ async function updateUI(telemetryObject) {
     log("nozzleTempPercentage = " + nozzleTempPercentage);
 
     // Set target temp in UI
-    $("#nozzleTargetTempF").text(nozzleTargetTemp);
-    $("#nozzleTargetTempC").text(telemetryObject.nozzle_target_temper);    
+    $("#nozzleTargetTempC").text(telemetryObject.nozzle_target_temper);
 
     // Set current temp in UI
-    var nozzleCurrentTemp = Math.round((telemetryObject.nozzle_temper * 9) / 5 + 32);
-    $("#nozzleCurrentTempF").text(nozzleCurrentTemp);
-    
     var nozzleCurrentTempC = Math.round(telemetryObject.nozzle_temper);
     $("#nozzleCurrentTempC").text(nozzleCurrentTempC);
 
-    log("nozzleCurrentTemp = " + nozzleCurrentTemp);
+    log("nozzleCurrentTemp = " + nozzleCurrentTempC);
 
     let progressNozzleParentWidth = $("#nozzleProgressBarParent").width();
     log("progressNozzleParentWidth = " + progressNozzleParentWidth);
@@ -108,42 +104,55 @@ async function updateUI(telemetryObject) {
 
     if (nozzleTargetTemp === "OFF") {
       $("#nozzleProgressBar").css("background-color", "grey");
-
-      $("#nozzleTargetTempC").hide();
       $("#nozzleTargetTempSymbolsF").hide();
+      $("#nozzleCurrentTempSymbolsF").hide();
+      $("#nozzleTargetTempF").hide();
+      $("#nozzleCurrentTempF").hide();
+      $("#nozzleCurrentTempC").hide();
       $("#nozzleTargetTempSymbolsC").hide();
+      $("#nozzleCurrentTempSymbolsC").hide();
+      $("#nozzleTargetTempC").hide();
     } else {
-      if (settings.BambuBoard_tempSetting === "Fahrenheit") {
-        $("#nozzleTargetTempSymbolsF").show();
-        $("#nozzleCurrentTempSymbolsF").show();
-        $("#nozzleTargetTempF").show();
-        $("#nozzleCurrentTempF").show();
+      // ADD CHECK: Ensure settings are loaded before applying display logic
+      if (!settings || typeof settings.BambuBoard_tempSetting === 'undefined') {
+          log("Aguardando configurações de temperatura para o bico...");
+          // Hide everything initially until settings load?
+          $("#nozzleTargetTempSymbolsF, #nozzleCurrentTempSymbolsF, #nozzleTargetTempF, #nozzleCurrentTempF").hide();
+          $("#nozzleCurrentTempC, #nozzleTargetTempSymbolsC, #nozzleCurrentTempSymbolsC, #nozzleTargetTempC").hide();
+      } else {
+          // Settings ARE loaded, apply original conditional logic
+          if (settings.BambuBoard_tempSetting === "Fahrenheit") {
+            $("#nozzleTargetTempSymbolsF").show();
+            $("#nozzleCurrentTempSymbolsF").show();
+            $("#nozzleTargetTempF").show();
+            $("#nozzleCurrentTempF").show();
 
-        $("#nozzleCurrentTempC").hide();
-        $("#nozzleTargetTempSymbolsC").hide();
-        $("#nozzleCurrentTempSymbolsC").hide();
-        $("#nozzleTargetTempC").hide();
-      } else if (settings.BambuBoard_tempSetting === "Celsius") {
-        $("#nozzleTargetTempSymbolsF").hide();
-        $("#nozzleCurrentTempSymbolsF").hide();
-        $("#nozzleTargetTempF").hide();
-        $("#nozzleCurrentTempF").hide();
+            $("#nozzleCurrentTempC").hide();
+            $("#nozzleTargetTempSymbolsC").hide();
+            $("#nozzleCurrentTempSymbolsC").hide();
+            $("#nozzleTargetTempC").hide();
+          } else if (settings.BambuBoard_tempSetting === "Celsius") {
+            $("#nozzleTargetTempSymbolsF").hide();
+            $("#nozzleCurrentTempSymbolsF").hide();
+            $("#nozzleTargetTempF").hide();
+            $("#nozzleCurrentTempF").hide();
 
-        $("#nozzleCurrentTempC").show();
-        $("#nozzleTargetTempSymbolsC").show();
-        $("#nozzleCurrentTempSymbolsC").show();
-        $("#nozzleTargetTempC").show();
-      } else if (settings.BambuBoard_tempSetting === "Both") {
-        $("#nozzleTargetTempSymbolsF").show();
-        $("#nozzleCurrentTempSymbolsF").show();
-        $("#nozzleTargetTempF").show();
-        $("#nozzleCurrentTempF").show();
+            $("#nozzleCurrentTempC").show();
+            $("#nozzleTargetTempSymbolsC").show();
+            $("#nozzleCurrentTempSymbolsC").show();
+            $("#nozzleTargetTempC").show();
+          } else if (settings.BambuBoard_tempSetting === "Both") { // Default to Both if value is unexpected?
+            $("#nozzleTargetTempSymbolsF").show();
+            $("#nozzleCurrentTempSymbolsF").show();
+            $("#nozzleTargetTempF").show();
+            $("#nozzleCurrentTempF").show();
 
-        $("#nozzleCurrentTempC").show();
-        $("#nozzleTargetTempSymbolsC").show();
-        $("#nozzleCurrentTempSymbolsC").show();
-        $("#nozzleTargetTempC").show();
-      }
+            $("#nozzleCurrentTempC").show();
+            $("#nozzleTargetTempSymbolsC").show();
+            $("#nozzleCurrentTempSymbolsC").show();
+            $("#nozzleTargetTempC").show();
+          }
+      } // End of check for loaded settings
 
       if (nozzleTempPercentage > 80) {
         $("#nozzleProgressBar").css("background-color", "red");

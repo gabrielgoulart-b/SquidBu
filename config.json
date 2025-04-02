@@ -1,12 +1,12 @@
 {
-  "BambuBoard_httpPort": 8080,
-  "BambuBoard_printerURL": "10.0.0.1",
+  "BambuBoard_httpPort": "8080",
+  "BambuBoard_printerURL": "192.168.1.100",
   "BambuBoard_printerPort": "8883",
-  "BambuBoard_printerSN": "FILL_THIS_OUT",
-  "BambuBoard_printerAccessCode": "FILL_THIS_OUT",
+  "BambuBoard_printerSN": "03919D4C1902856",
+  "BambuBoard_printerAccessCode": "16765148",
   "BambuBoard_tempSetting": "Both",
   "BambuBoard_displayFanPercentages": false,
   "BambuBoard_displayFanIcons": true,
-  "BambuBoard_printerType": "X1",
+  "BambuBoard_printerType": "A1",
   "BambuBoard_logging": false
 }
