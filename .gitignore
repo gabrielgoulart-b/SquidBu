@@ -13,10 +13,15 @@ env/
 # Arquivos de Sistema
 .DS_Store
 
+# Arquivo de Configuração Local (NÃO ENVIAR!)
+config.json
+
 BambuData.txt
 data.json
 node_modules/*
 package-lock.json
-config.json
 note.json
 accessToken.json
+
+# Arquivos de Log
+*.log

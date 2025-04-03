@@ -4,13 +4,39 @@ import threading
 import time
 import ssl
 import requests
+import os
 from flask import Flask, render_template, jsonify, Response, stream_with_context
 
-# --- Configurações da Impressora (EDITAR ESTAS LINHAS) ---
-PRINTER_IP = "192.168.1.100"  # Substitua pelo IP da sua impressora
-ACCESS_CODE = "16765148" # Substitua pelo seu Código de Acesso LAN
-DEVICE_ID = "03919D4C1902856" # Substitua pelo Número de Série da sua impressora
-# ---------------------------------------------------------
+# --- Carregar Configuração ---
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+config = {}
+try:
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+except FileNotFoundError:
+    print(f"ERRO CRÍTICO: Arquivo de configuração '{CONFIG_FILE}' não encontrado.")
+    print("Por favor, copie 'config.json.example' para 'config.json' e preencha seus dados.")
+    exit(1)
+except json.JSONDecodeError:
+    print(f"ERRO CRÍTICO: Arquivo de configuração '{CONFIG_FILE}' contém JSON inválido.")
+    exit(1)
+except Exception as e:
+    print(f"ERRO CRÍTICO: Falha ao carregar '{CONFIG_FILE}': {e}")
+    exit(1)
+
+# Validações básicas de configuração
+required_keys = ["PRINTER_IP", "ACCESS_CODE", "DEVICE_ID", "CAMERA_URL"]
+missing_keys = [key for key in required_keys if key not in config or not config[key]]
+if missing_keys:
+    print(f"ERRO CRÍTICO: Chaves obrigatórias ausentes ou vazias em '{CONFIG_FILE}': {missing_keys}")
+    exit(1)
+
+# --- Usar Valores da Configuração ---
+PRINTER_IP = config["PRINTER_IP"]
+ACCESS_CODE = config["ACCESS_CODE"]
+DEVICE_ID = config["DEVICE_ID"]
+CAMERA_URL = config["CAMERA_URL"]
+# -----------------------------------
 
 MQTT_PORT = 8883
 MQTT_USER = "bblp"
@@ -123,10 +149,6 @@ def get_status():
     return jsonify(current_status)
 
 # --- Rota para Proxy da Câmera ---
-
-# URL da câmera (Pode precisar de ajuste!)
-CAMERA_URL = "http://192.168.1.108:9000/?action=stream" # Atualizado com URL do usuário
-# Alternativas comuns: /webcam/?action=stream ou apenas http://{PRINTER_IP}/webcam
 
 @app.route('/camera_proxy')
 def camera_proxy():

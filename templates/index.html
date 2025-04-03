@@ -192,6 +192,30 @@
         /* Ajustar cores de eixos/grades se necessário */
         /* Chart.defaults.color = 'var(--text-color)'; // Pode ser global ou por opções */
 
+        /* Media Query para Telas Menores (Responsividade) */
+        @media (max-width: 768px) {
+            #layout-container {
+                flex-direction: column; /* Empilha as colunas */
+            }
+            /* Opcional: Ajustar min-width se necessário, mas flex: 1 já deve funcionar */
+            #left-column,
+            #center-column,
+            #right-column {
+                 min-width: unset; /* Remove largura mínima fixa */
+                 width: 100%; /* Faz ocupar toda a largura disponível */
+            }
+            .container {
+                margin: 10px; /* Reduz margens laterais em telas pequenas */
+                padding: 15px;
+            }
+            h1 {
+                font-size: 1.5em;
+            }
+            h2 {
+                font-size: 1.1em;
+            }
+        }
+
     </style>
 </head>
 <body>
