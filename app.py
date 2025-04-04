@@ -12,6 +12,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired
 from werkzeug.security import generate_password_hash, check_password_hash
+from pywebpush import webpush, WebPushException
 
 # --- Carregar Configuração ---
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
@@ -53,7 +54,11 @@ CAMERA_URL = config["CAMERA_URL"]
 SECRET_KEY = config["SECRET_KEY"]
 LOGIN_USERNAME = config["LOGIN_USERNAME"]
 LOGIN_PASSWORD_HASH = config["LOGIN_PASSWORD_HASH"]
-LIVE_SHARE_TOKEN = config.get("LIVE_SHARE_TOKEN") # Usar .get() para não quebrar se a chave não existir
+LIVE_SHARE_TOKEN = config.get("LIVE_SHARE_TOKEN")
+VAPID_PUBLIC_KEY = config.get("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY = config.get("VAPID_PRIVATE_KEY")
+VAPID_MAILTO = config.get("VAPID_MAILTO", "mailto:example@example.com")
+VAPID_ENABLED = config.get('VAPID_ENABLED', False)
 # -----------------------------------
 
 MQTT_PORT = 8883
@@ -72,6 +77,10 @@ status_lock = threading.Lock() # Para acesso seguro à variável entre threads
 # Variável global para o sequence_id dos comandos (gerenciado pelo backend)
 command_sequence_id = int(time.time()) # Inicializa com timestamp
 sequence_lock = threading.Lock()
+
+# Adicionar estas duas linhas
+MAINTENANCE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'maintenance_data.json')
+maintenance_lock = threading.Lock()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -145,10 +154,13 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/')
-@login_required # Protege a rota principal
+@login_required
 def index():
     """Renderiza a página HTML principal."""
-    return render_template('index.html')
+    # Passa a chave pública VAPID e o token de compartilhamento para o template
+    return render_template('index.html', 
+                           vapid_public_key=VAPID_PUBLIC_KEY if VAPID_ENABLED else None, 
+                           live_share_token=LIVE_SHARE_TOKEN)
 
 @app.route('/status')
 # @login_required # REMOVIDO - Acesso permitido para a página /live
@@ -415,6 +427,199 @@ def live_view(token):
         return "Acesso não autorizado.", 403
 # --- Fim da Nova Rota ---
 
+# --- Armazenamento de Assinaturas Push ---
+SUBSCRIPTIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'subscriptions.json')
+subscriptions_lock = threading.Lock()
+
+def load_subscriptions():
+    with subscriptions_lock:
+        try:
+            if os.path.exists(SUBSCRIPTIONS_FILE):
+                with open(SUBSCRIPTIONS_FILE, 'r') as f:
+                    # Carrega como lista de {endpoint: subscription_info}
+                    # Usamos endpoint como chave para fácil remoção/atualização
+                    # O valor pode ser o objeto subscription completo
+                    subs_dict = json.load(f)
+                    # Validar minimamente se é um dicionário
+                    return subs_dict if isinstance(subs_dict, dict) else {}
+            else:
+                return {}
+        except (IOError, json.JSONDecodeError) as e:
+            print(f"Erro ao ler {SUBSCRIPTIONS_FILE}: {e}", flush=True)
+            return {}
+
+def save_subscriptions(subscriptions):
+    with subscriptions_lock:
+        try:
+            with open(SUBSCRIPTIONS_FILE, 'w') as f:
+                json.dump(subscriptions, f, indent=4)
+        except IOError as e:
+            print(f"Erro ao escrever {SUBSCRIPTIONS_FILE}: {e}", flush=True)
+
+# Carrega assinaturas na inicialização
+push_subscriptions = load_subscriptions()
+
+# --- Variáveis de Estado para Detecção de Eventos ---
+last_print_status = None # Armazena o estado anterior da impressão
+status_lock = threading.Lock() # Reutiliza o lock existente
+
+# --- Função para Enviar Notificações Push ---
+def send_push_notification(title, body, icon=None, badge=None, data=None):
+    if not VAPID_ENABLED:
+        # print("Debug: VAPID desabilitado, não enviando push.", flush=True)
+        return
+
+    print(f"Preparando para enviar notificação: {title} - {body}", flush=True)
+    notification_payload = json.dumps({
+        "title": title,
+        "body": body,
+        "icon": icon or '/static/icons/android-chrome-192x192.png',
+        "badge": badge or '/static/icons/favicon-96x96.png',
+        "data": data or {"url": "/"} # URL padrão para abrir ao clicar
+    })
+
+    vapid_claims = {
+        "sub": VAPID_MAILTO
+    }
+
+    subs_to_remove = []
+    with subscriptions_lock:
+        current_subs = push_subscriptions.copy() # Trabalha com uma cópia
+
+    if not current_subs:
+        print("Nenhuma assinatura push encontrada para enviar notificação.", flush=True)
+        return
+
+    print(f"Enviando para {len(current_subs)} assinaturas...", flush=True)
+    for endpoint, sub_info in current_subs.items():
+        try:
+            # Verifica se sub_info é um dicionário válido com 'endpoint'
+            if isinstance(sub_info, dict) and 'endpoint' in sub_info:
+                webpush(
+                    subscription_info=sub_info,
+                    data=notification_payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims=vapid_claims
+                )
+                # print(f"Notificação enviada para: {sub_info.get('endpoint')[:30]}...", flush=True)
+            else:
+                 print(f"AVISO: Assinatura inválida encontrada para endpoint {endpoint}, pulando.", flush=True)
+                 subs_to_remove.append(endpoint) # Marcar para remoção se a estrutura estiver errada
+
+        except WebPushException as ex:
+            print(f"Erro ao enviar WebPush para {sub_info.get('endpoint', 'Desconhecido')[:30]}...: {ex}", flush=True)
+            # Se a assinatura expirou ou é inválida (ex: 404, 410 Gone), marca para remover
+            if ex.response and ex.response.status_code in [404, 410]:
+                print(f"Marcando assinatura {endpoint} para remoção.", flush=True)
+                subs_to_remove.append(endpoint)
+        except Exception as e:
+             print(f"Erro inesperado ao enviar WebPush para {sub_info.get('endpoint', 'Desconhecido')[:30]}...: {e}", flush=True)
+
+    # Remove assinaturas inválidas/expiradas
+    if subs_to_remove:
+        print(f"Removendo {len(subs_to_remove)} assinaturas inválidas...", flush=True)
+        with subscriptions_lock:
+            for endpoint in subs_to_remove:
+                push_subscriptions.pop(endpoint, None)
+            save_subscriptions(push_subscriptions) # Salva o dicionário atualizado
+
+# --- Callback MQTT Modificado para Detecção de Eventos ---
+def on_message(client, userdata, msg):
+    """Callback executado quando uma mensagem é recebida."""
+    global printer_status, last_print_status
+    try:
+        payload = json.loads(msg.payload.decode('utf-8'))
+        new_status_data = {} # Acumula dados recebidos nesta mensagem
+        if isinstance(payload.get('print'), dict):
+             new_status_data.update(payload['print'])
+        # Adicione outros top-level keys se necessário (ex: 'system')
+        # if isinstance(payload.get('system'), dict):
+        #     new_status_data.update(payload['system'])
+
+        with status_lock:
+            # Atualiza o estado global
+            for key, value in payload.items():
+                if isinstance(value, dict):
+                    if key in printer_status and isinstance(printer_status.get(key), dict):
+                        printer_status[key].update(value)
+                    else:
+                        printer_status[key] = value
+                # else: # Considerar atualizar chaves não-dicionário também? 
+                #     printer_status[key] = value
+
+            # Lógica de Detecção de Eventos de Impressão
+            current_print_info = printer_status.get('print', {})
+            current_mc_status = current_print_info.get('mc_print_stage')
+            current_gcode_file = current_print_info.get('gcode_file', '')
+            current_result = current_print_info.get('mc_print_result')
+
+            previous_mc_status = last_print_status.get('mc_print_stage') if last_print_status else None
+            previous_gcode_file = last_print_status.get('gcode_file', '') if last_print_status else ''
+
+            # Evento: Impressão Iniciada
+            if current_mc_status == 'PRINTING' and previous_mc_status != 'PRINTING':
+                 if current_gcode_file:
+                    filename = os.path.basename(current_gcode_file)
+                    send_push_notification("Impressão Iniciada!", f"Arquivo: {filename}")
+                 else:
+                     send_push_notification("Impressão Iniciada!", "Um novo trabalho começou.")
+
+            # Evento: Impressão Concluída/Falhou/Parou
+            if previous_mc_status == 'PRINTING' and current_mc_status != 'PRINTING':
+                 filename = os.path.basename(previous_gcode_file) if previous_gcode_file else "Trabalho anterior"
+                 if current_result == 0: # Sucesso (código 0 geralmente indica sucesso)
+                     send_push_notification("Impressão Concluída! ✅", f"Arquivo: {filename}")
+                 elif current_result == 4: # Parada pelo usuário (comum para cancelamento)
+                      send_push_notification("Impressão Parada ⏹️", f"Arquivo: {filename}")
+                 else: # Outros resultados podem ser erros
+                     error_code = current_result or "Desconhecido"
+                     send_push_notification("Erro na Impressão! ❌", f"Arquivo: {filename}\nResultado/Erro: {error_code}")
+
+            # Atualiza o último estado conhecido para a próxima comparação
+            last_print_status = current_print_info.copy()
+
+    except json.JSONDecodeError:
+        print(f"Erro ao decodificar JSON: {msg.payload.decode()}", flush=True)
+    except Exception as e:
+        print(f"Erro ao processar mensagem MQTT ou enviar push: {e}", flush=True)
+
+# --- Rotas Flask ---
+
+# --- NOVA Rota para Salvar Assinaturas Push ---
+@app.route('/save_subscription', methods=['POST'])
+@login_required # Apenas usuários logados podem registrar notificações
+def save_subscription():
+    """Recebe e salva a assinatura push enviada pelo frontend."""
+    if not VAPID_ENABLED:
+        return jsonify({"success": False, "error": "Push notifications not enabled on server."}), 501
+
+    subscription_data = request.json
+
+    if not subscription_data:
+        # Pode ser um pedido de cancelamento (frontend envia null)
+        # Ou erro
+        print("Recebido pedido para remover assinatura (payload null/vazio).", flush=True)
+        # Idealmente, o frontend enviaria o endpoint a ser removido
+        # Por enquanto, não fazemos nada se for null, o cancelamento é local
+        # Se quiséssemos remover do backend, precisaríamos do endpoint.
+        return jsonify({"success": True, "message": "Subscription removal request noted (no action taken server-side for null)."})
+
+    # Validação mínima da assinatura recebida
+    if not isinstance(subscription_data, dict) or 'endpoint' not in subscription_data:
+        print(f"Erro: Dados de assinatura inválidos recebidos: {subscription_data}", flush=True)
+        return jsonify({"success": False, "error": "Invalid subscription object"}), 400
+
+    endpoint = subscription_data['endpoint']
+    print(f"Recebida assinatura para endpoint: {endpoint[:50]}...", flush=True)
+
+    with subscriptions_lock:
+        push_subscriptions[endpoint] = subscription_data # Salva/Atualiza usando endpoint como chave
+        save_subscriptions(push_subscriptions) # Salva no arquivo
+
+    return jsonify({"success": True})
+
+# --- Fim da Nova Rota ---
+
 # --- Funções MQTT ---
 
 def get_next_sequence_id():
@@ -444,20 +649,62 @@ def on_disconnect(client, userdata, rc, properties=None):
 
 def on_message(client, userdata, msg):
     """Callback executado quando uma mensagem é recebida."""
-    global printer_status
+    global printer_status, last_print_status
     try:
         payload = json.loads(msg.payload.decode('utf-8'))
+        new_status_data = {} # Acumula dados recebidos nesta mensagem
+        if isinstance(payload.get('print'), dict):
+             new_status_data.update(payload['print'])
+        # Adicione outros top-level keys se necessário (ex: 'system')
+        # if isinstance(payload.get('system'), dict):
+        #     new_status_data.update(payload['system'])
+
         with status_lock:
+            # Atualiza o estado global
             for key, value in payload.items():
                 if isinstance(value, dict):
                     if key in printer_status and isinstance(printer_status.get(key), dict):
                         printer_status[key].update(value)
                     else:
                         printer_status[key] = value
+                # else: # Considerar atualizar chaves não-dicionário também? 
+                #     printer_status[key] = value
+
+            # Lógica de Detecção de Eventos de Impressão
+            current_print_info = printer_status.get('print', {})
+            current_mc_status = current_print_info.get('mc_print_stage')
+            current_gcode_file = current_print_info.get('gcode_file', '')
+            current_result = current_print_info.get('mc_print_result')
+
+            previous_mc_status = last_print_status.get('mc_print_stage') if last_print_status else None
+            previous_gcode_file = last_print_status.get('gcode_file', '') if last_print_status else ''
+
+            # Evento: Impressão Iniciada
+            if current_mc_status == 'PRINTING' and previous_mc_status != 'PRINTING':
+                 if current_gcode_file:
+                    filename = os.path.basename(current_gcode_file)
+                    send_push_notification("Impressão Iniciada!", f"Arquivo: {filename}")
+                 else:
+                     send_push_notification("Impressão Iniciada!", "Um novo trabalho começou.")
+
+            # Evento: Impressão Concluída/Falhou/Parou
+            if previous_mc_status == 'PRINTING' and current_mc_status != 'PRINTING':
+                 filename = os.path.basename(previous_gcode_file) if previous_gcode_file else "Trabalho anterior"
+                 if current_result == 0: # Sucesso (código 0 geralmente indica sucesso)
+                     send_push_notification("Impressão Concluída! ✅", f"Arquivo: {filename}")
+                 elif current_result == 4: # Parada pelo usuário (comum para cancelamento)
+                      send_push_notification("Impressão Parada ⏹️", f"Arquivo: {filename}")
+                 else: # Outros resultados podem ser erros
+                     error_code = current_result or "Desconhecido"
+                     send_push_notification("Erro na Impressão! ❌", f"Arquivo: {filename}\nResultado/Erro: {error_code}")
+
+            # Atualiza o último estado conhecido para a próxima comparação
+            last_print_status = current_print_info.copy()
+
     except json.JSONDecodeError:
         print(f"Erro ao decodificar JSON: {msg.payload.decode()}", flush=True)
     except Exception as e:
-        print(f"Erro ao processar mensagem MQTT: {e}", flush=True)
+        print(f"Erro ao processar mensagem MQTT ou enviar push: {e}", flush=True)
 
 def request_full_status(client):
     """Envia uma solicitação para obter o status completo da impressora."""

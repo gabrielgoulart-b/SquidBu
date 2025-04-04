@@ -9,11 +9,12 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
     *   **Overview:** Current printer status, Wi-Fi signal.
     *   **Progress:** G-code file, current/total layer, remaining time, progress bar.
     *   **Temperatures & Fans:** Current and target nozzle/bed temperature, chamber temperature (if available), fan speeds.
-    *   **AMS:** Details of each AMS unit and tray (filament type, color, estimated remaining percentage).
+    *   **AMS:** Details of each AMS unit and tray (filament type, color, estimated remaining percentage). *(Note: Interface now attempts to read `stg` array data for better AMS Lite compatibility).*
     *   **Camera:** Displays the video stream from the printer's camera (requires correct URL configuration in `config.json` and camera accessibility).
     *   **Temperature Chart:** History of nozzle, bed, and chamber temperatures.
 *   **User Authentication:** Login system with username and password to protect access to the main interface. Includes a "Remember Me" option.
-*   **Shareable Live View:** A special URL (`/live/<token>`) allows sharing a simplified view (progress and camera) without login, protected by a secret token.
+*   **Shareable Live View:** A special URL (`/live/<token>`) allows sharing a simplified view (progress and camera) without login, protected by a secret token. Now includes a "🔗 Share" button in the top bar for easier link copying/sending.
+*   **Push Notifications:** Receive notifications on your browser or phone for important print events (start, finish, error/pause) using Web Push. Requires configuration (see below).
 *   **Light/Dark Theme:** Toolbar button to toggle the visual theme, with preference saved in the browser.
 *   **Responsive Layout:** The interface automatically adapts for better viewing on desktop and mobile screens (with a collapsible sidebar on mobile).
 *   **Remote Access (Optional):** Can be configured via Tailscale Funnel for secure access from outside the local network.
@@ -30,10 +31,12 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
 *   `templates/login.html`: Login page.
 *   `templates/live_view.html`: Simplified page for shared live view.
 *   `static/css/style.css`: Main stylesheet.
-*   `static/js/script.js`: JavaScript for the main interface (data updates, themes, etc.).
+*   `static/js/script.js`: JavaScript for the main interface (data updates, themes, sharing, etc.).
+*   `static/js/notifications.js`: JavaScript for managing push notifications.
+*   `static/js/service-worker.js`: Service Worker for receiving push notifications.
 *   `config.json`: Local configuration file (NOT versioned).
 *   `config.json.example`: Example configuration file.
-*   `requirements.txt`: Python dependencies (Flask, paho-mqtt, requests, Flask-Login, Flask-WTF).
+*   `requirements.txt`: Python dependencies (Flask, paho-mqtt, requests, Flask-Login, Flask-WTF, pywebpush).
 *   `SquidStart.py`: Optional script to start and monitor `app.py` and `tailscale funnel` on boot via systemd.
 *   `LEIAME.md`: README file in Brazilian Portuguese.
 *   `.gitignore`: File to prevent unnecessary files (like `venv`, `config.json`, logs) from being committed to Git.
@@ -80,6 +83,18 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
              python3 -c 'import secrets; print(secrets.token_hex(16))'
              # Copy the output and paste it as the key's value in the JSON.
              ```
+        *   **VAPID Settings (for Push Notifications - Optional):**
+            *   `VAPID_ENABLED`: Set to `true` to enable push notifications, or `false` to disable.
+            *   `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_MAILTO`: Keys required for Web Push. To generate them:
+                1.  Ensure the virtual environment is active (`source venv/bin/activate`).
+                2.  Ensure `pywebpush` is installed (`pip install pywebpush`).
+                3.  Run the Python command to generate and display the keys (adjust command if the library changes):
+                    ```bash
+                    python -c "import base64; from cryptography.hazmat.primitives import serialization; from pywebpush import Vapid; v = Vapid(); v.generate_keys(); pk_raw = v.public_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint); sk_der = v.private_key.private_bytes(encoding=serialization.Encoding.DER, format=serialization.PrivateFormat.PKCS8, encryption_algorithm=serialization.NoEncryption()); print(f\"Private Key: {base64.urlsafe_b64encode(sk_der).rstrip(b'=').decode('utf-8')}\"); print(f\"Public Key (Raw): {base64.urlsafe_b64encode(pk_raw).rstrip(b'=').decode('utf-8')}\")"
+                    ```
+                4.  Copy the generated "Public Key (Raw)" and paste it as the value for `VAPID_PUBLIC_KEY` in `config.json`.
+                5.  Copy the generated "Private Key" and paste it as the value for `VAPID_PRIVATE_KEY` in `config.json`.
+                6.  Set `VAPID_MAILTO` to your email address in the format `mailto:youremail@example.com`. This is used by some push services.
     *   **Important:** The `config.json` file contains sensitive information and **will not be committed** to GitHub (it's in `.gitignore`).
 
 3.  **Create and Activate the Virtual Environment:**
@@ -115,9 +130,11 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
     *   Go to: `http://<IP_OF_DEVICE_RUNNING_APP>:5000` (replace with the IP of the device running the app).
     *   You will be redirected to the login page. Use the `LOGIN_USERNAME` and the password corresponding to the `LOGIN_PASSWORD_HASH` configured.
 
+4.  **Enable Notifications (Optional):** If configured in `config.json`, click the 🔔 button in the top bar and allow notifications in your browser.
+
 ## Shareable Live View (Optional)
 
-If you configured a `LIVE_SHARE_TOKEN` in `config.json`, you can share a read-only view (progress and camera) using a special link:
+If you configured a `LIVE_SHARE_TOKEN` in `config.json`, you can click the "🔗 Share" button in the top bar to copy or send the special link:
 
 `http://<IP_OF_DEVICE_RUNNING_APP>:5000/live/<YOUR_LIVE_SHARE_TOKEN>`
 
@@ -133,4 +150,6 @@ Or, if using Tailscale Funnel:
 
 (This section remains the same, but remember that accessing via the Tailscale URL will also require login for the main interface).
 
-// ... (Rest of the README: Tailscale, Start on Boot, Troubleshooting) ... 
+## Start on Boot ...
+
+## Troubleshooting ... 

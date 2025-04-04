@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SquidBu - Monitor Bambu</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='icons/site.webmanifest') }}"> <!-- Se existir -->
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
+    <!-- Adicione outras tags se o gerador forneceu (ex: mask-icon, msapplication-TileColor) -->
+    <!-- Fim Favicons -->
+
     <!-- Inclui Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Adicionar Date adapter e dependência DEPOIS do Chart.js -->
@@ -11,9 +21,13 @@
     <!-- Link para o CSS externo -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body data-theme="light" data-vapid-key="{{ vapid_public_key or '' }}" data-share-token="{{ live_share_token or '' }}">
+    <!-- Timestamp da Última Edição: @@TIMESTAMP@@ -->
     <nav id="sidebar">
-        <h2>SquidBu</h2>
+        <h2>
+            <img src="{{ url_for('static', filename='icons/favicon.ico') }}" alt="Ícone SquidBu" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">
+            SquidBu
+        </h2>
         <ul>
             <li><a href="#dashboard-content" class="active"><span class="link-text">Dashboard</span></a></li>
             <li><a href="#controle-content"><span class="link-text">Controle</span></a></li>
@@ -24,15 +38,24 @@
     </nav>
 
     <main id="main-content">
+        <!-- GARANTIR que a div#toolbar original exista e adicionar o botão Share -->
         <div id="toolbar">
-            <button id="menu-toggle">☰</button>
+            <button id="menu-toggle">☰</button> 
             <div id="toolbar-temps">
                 <span>🔥 <span id="toolbar-nozzle-value">-- / --</span> °C</span>
                 <span>⏹️ <span id="toolbar-bed-value">-- / --</span> °C</span>
                 <span id="toolbar-chamber-item" style="display: none;">🌡️ <span id="toolbar-chamber-value">--</span> °C</span>
             </div>
-            <button id="theme-toggle">🌙 Tema Escuro</button>
+            <!-- Botões originais da toolbar + botão de compartilhar -->
+            <button id="share-link-button" class="action-button" title="Compartilhar Live Link" style="margin-left: auto;">🔗 Compartilhar</button>
+            <button id="theme-toggle">🌓 Tema</button>
+            <button id="notifications-toggle" title="Gerenciar Notificações Push" style="margin-left: 10px;">🔔</button>
+            <form action="{{ url_for('logout') }}" method="post" style="display: inline; margin-left: 10px;">
+                <button type="submit" class="action-button">Logout</button>
+            </form>
         </div>
+
+        <div id="notification-status" style="padding: 5px 20px; font-size: 0.8em; background-color: var(--item-alt-bg); color: var(--label-color); text-align: center;"></div>
 
         <!-- Seção Dashboard -->
         <section id="dashboard-content" class="content-section active">
@@ -269,6 +292,9 @@
 
     <!-- Link para o JS externo -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <!-- Link para o JS das NOTIFICAÇÕES -->
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
 
     <!-- ADD START: Código JS da Sidebar Corrigido -->
     <script>

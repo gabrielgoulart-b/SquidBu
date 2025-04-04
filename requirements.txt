@@ -2,4 +2,5 @@ Flask
 paho-mqtt
 requests
 Flask-Login
-Flask-WTF 
+Flask-WTF
+pywebpush 

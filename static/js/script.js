@@ -1,30 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("[DEBUG] DOMContentLoaded iniciado");
+    // console.log("[DEBUG] DOMContentLoaded iniciado");
 
     // =======================================
     // FUNÇÕES AUXILIARES (DEFINIDAS PRIMEIRO)
     // =======================================
     function createStatusItem(label, value, unit = '') {
-        console.log(`[DEBUG] createStatusItem chamado com: label=${label}, value=${value}`);
+        // console.log(`[DEBUG] createStatusItem chamado com: label=${label}, value=${value}`);
         try {
-            console.log("[DEBUG] createStatusItem: Criando div...");
+            // console.log("[DEBUG] createStatusItem: Criando div...");
             const itemDiv = document.createElement('div');
             if (!itemDiv) {
-                console.error("[DEBUG] ERRO CRÍTICO: document.createElement falhou!");
+                console.error("ERRO CRÍTICO: document.createElement falhou!");
                 return document.createTextNode("Erro interno");
             }
             itemDiv.className = 'status-item';
-            console.log("[DEBUG] createStatusItem: Definindo innerHTML...");
+            // console.log("[DEBUG] createStatusItem: Definindo innerHTML...");
             itemDiv.innerHTML = `<strong>${label}</strong><span class="status-value">${value !== undefined && value !== null ? value : '--'}${unit}</span>`;
-            console.log("[DEBUG] createStatusItem: innerHTML definido. Verificando se é Node...");
+            // console.log("[DEBUG] createStatusItem: innerHTML definido. Verificando se é Node...");
             if (!(itemDiv instanceof Node)) {
-                 console.error("[DEBUG] ERRO CRÍTICO: itemDiv não é um Node após innerHTML!");
+                 console.error("ERRO CRÍTICO: itemDiv não é um Node após innerHTML!");
                  return document.createTextNode("Erro interno");
             }
-             console.log("[DEBUG] createStatusItem: Retornando itemDiv:", itemDiv);
+             // console.log("[DEBUG] createStatusItem: Retornando itemDiv:", itemDiv);
             return itemDiv;
         } catch (e) {
-            console.error("[DEBUG] Erro DENTRO de createStatusItem:", e);
+            console.error("Erro DENTRO de createStatusItem:", e);
             return document.createTextNode("Erro interno");
         }
     }
@@ -43,14 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hexToRgb(hex) {
         if (!hex || typeof hex !== 'string') {
-            console.error('[DEBUG] hexToRgb: Input inválido:', hex);
+            // console.error('[DEBUG] hexToRgb: Input inválido:', hex);
             return 'rgb(128, 128, 128)'; // Cinza como fallback
         }
         // Remove # se presente e pega os 6 primeiros caracteres (ignora Alpha)
         const hexClean = hex.startsWith('#') ? hex.slice(1, 7) : hex.slice(0, 6);
 
         if (hexClean.length !== 6) {
-             console.error('[DEBUG] hexToRgb: Hex inválido após limpar:', hexClean, 'Original:', hex);
+             // console.error('[DEBUG] hexToRgb: Hex inválido após limpar:', hexClean, 'Original:', hex);
              return 'rgb(128, 128, 128)'; // Cinza como fallback
         }
 
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const b = bigint & 255;
             return `rgb(${r}, ${g}, ${b})`;
         } catch (e) {
-            console.error('[DEBUG] hexToRgb: Erro ao converter hex:', hex, e);
+            console.error('hexToRgb: Erro ao converter hex:', hex, e);
             return 'rgb(128, 128, 128)'; // Cinza como fallback
         }
     }
@@ -132,20 +132,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // FUNÇÕES PRINCIPAIS (APÓS VARIÁVEIS E ELEMENTOS)
     // =======================================
     function applyTheme(theme) {
-         console.log("[DEBUG] applyTheme chamada com tema:", theme);
+         // console.log("[DEBUG] applyTheme chamada com tema:", theme);
          const isDark = theme === 'dark';
          document.body.classList.toggle('dark-theme', isDark);
          themeToggleButton.textContent = isDark ? '☀️ Tema Claro' : '🌙 Tema Escuro';
-         console.log("[DEBUG] applyTheme: Classe/Texto do botão atualizado.");
-         console.log("[DEBUG] applyTheme: Atualização do gráfico concluída (se houver gráfico).");
+         // console.log("[DEBUG] applyTheme: Classe/Texto do botão atualizado.");
+         // Atualiza cores do gráfico se ele existir
+         if (tempChart) {
+            const textColor = isDark ? '#dee2e6' : '#333';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            tempChart.options.scales.x.ticks.color = textColor;
+            tempChart.options.scales.x.title.color = textColor;
+            tempChart.options.scales.x.grid.color = gridColor;
+            tempChart.options.scales.y.ticks.color = textColor;
+            tempChart.options.scales.y.title.color = textColor;
+            tempChart.options.scales.y.grid.color = gridColor;
+            tempChart.options.plugins.legend.labels.color = textColor;
+            tempChart.update('none'); // Atualiza sem animação
+            // console.log("[DEBUG] applyTheme: Atualização do gráfico concluída.");
+         }
     }
     function initializeChart() {
-        console.log("[DEBUG] initializeChart: Iniciando...");
+        // console.log("[DEBUG] initializeChart: Iniciando...");
         if (!chartCtx) {
-            console.error("[DEBUG] initializeChart: ERRO - Canvas 'temperatureChart' não encontrado!");
+            // console.error("[DEBUG] initializeChart: ERRO - Canvas 'temperatureChart' não encontrado!");
             return;
         }
-        console.log("[DEBUG] initializeChart: Canvas encontrado.");
+        // console.log("[DEBUG] initializeChart: Canvas encontrado.");
 
         const initialData = {
             labels: [],
@@ -157,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            console.log("[DEBUG] initializeChart: Criando novo Chart...");
+            // console.log("[DEBUG] initializeChart: Criando novo Chart...");
             tempChart = new Chart(chartCtx, {
                 type: 'line',
                 data: initialData,
@@ -185,19 +198,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-            console.log("[DEBUG] initializeChart: Gráfico criado com sucesso:", tempChart);
+            // console.log("[DEBUG] initializeChart: Gráfico criado com sucesso:", tempChart);
+            // Aplica tema inicial ao gráfico
+            applyTheme(localStorage.getItem('theme') || 'light');
         } catch (e) {
-             console.error("[DEBUG] initializeChart: ERRO ao criar Chart:", e);
-             tempChart = null; // Garante que não tentaremos usar um gráfico inválido
+             console.error("initializeChart: ERRO ao criar Chart:", e);
+             tempChart = null;
         }
     }
     function addDataToChart(timestamp, nozzleTemp, bedTemp, chamberTemp) {
-        console.log(`[DEBUG] addDataToChart: Recebido T=${timestamp}, Bico=${nozzleTemp}, Mesa=${bedTemp}, Cam=${chamberTemp}`);
+        // console.log(`[DEBUG] addDataToChart: Recebido T=${timestamp}, Bico=${nozzleTemp}, Mesa=${bedTemp}, Cam=${chamberTemp}`);
         if (!tempChart || !tempChart.data || !tempChart.data.labels || !tempChart.data.datasets) {
-            console.warn("[DEBUG] addDataToChart: Gráfico não inicializado ou inválido, abortando.");
+            // console.warn("[DEBUG] addDataToChart: Gráfico não inicializado ou inválido, abortando.");
             return;
         }
-
         try {
             const now = timestamp || Date.now(); // Usa timestamp recebido ou o atual
             const labels = tempChart.data.labels;
@@ -210,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nozzleData.push(nozzleTemp !== null && nozzleTemp !== undefined ? nozzleTemp : NaN); // Usa NaN para gaps
             bedData.push(bedTemp !== null && bedTemp !== undefined ? bedTemp : NaN);
             chamberData.push(chamberTemp !== null && chamberTemp !== undefined ? chamberTemp : NaN);
-            console.log("[DEBUG] addDataToChart: Dados adicionados aos arrays.");
+            // console.log("[DEBUG] addDataToChart: Dados adicionados aos arrays.");
 
             // Remove dados antigos se exceder o limite (vamos ajustar isso depois para 1h)
             if (labels.length > MAX_DATA_POINTS) {
@@ -218,292 +232,321 @@ document.addEventListener('DOMContentLoaded', () => {
                 nozzleData.shift();
                 bedData.shift();
                 chamberData.shift();
-                console.log("[DEBUG] addDataToChart: Dados antigos removidos (MAX_DATA_POINTS).");
+                // console.log("[DEBUG] addDataToChart: Dados antigos removidos (MAX_DATA_POINTS).");
             }
 
             // Atualiza o gráfico
-            console.log("[DEBUG] addDataToChart: Chamando tempChart.update()...");
+            // console.log("[DEBUG] addDataToChart: Chamando tempChart.update()...");
             tempChart.update();
-            console.log("[DEBUG] addDataToChart: tempChart.update() concluído.");
-
+            // console.log("[DEBUG] addDataToChart: tempChart.update() concluído.");
         } catch (e) {
-            console.error("[DEBUG] addDataToChart: ERRO durante atualização do gráfico:", e);
+            console.error("addDataToChart: ERRO durante atualização do gráfico:", e);
         }
     }
     function updateUI(data) {
-         console.log("[DEBUG] updateUI chamada...");
-         try {
-             if (!errorDiv) { console.error("#error-message não encontrado!"); return; }
-             errorDiv.style.display = 'none';
-             console.log("[DEBUG] updateUI: Limpando divs...");
+        // console.log("[DEBUG] updateUI chamada...");
+        try {
+            if (!errorDiv) { console.error("#error-message não encontrado!"); return; }
+            errorDiv.style.display = 'none';
+            // console.log("[DEBUG] updateUI: Limpando divs...");
+            const clearIfExists = (el) => { if (el) el.innerHTML = ''; };
+            // console.log(`[DEBUG] Verificando elementos...`); // Removido log detalhado
+            clearIfExists(overviewDiv);
+            clearIfExists(progressDiv);
+            clearIfExists(progressBarSection);
+            clearIfExists(tempsFansDiv);
+            clearIfExists(amsDiv);
+            clearIfExists(taskDiv);
+            clearIfExists(otherDiv);
 
-             // Limpar divs containers
-             const clearIfExists = (el) => { if (el) el.innerHTML = ''; else console.warn(`Elemento para limpar não encontrado:`, el ? el.id : 'ID não encontrado'); };
+            const printStatus = data.print || {};
+            const systemStatus = data.system || {}; // Adicionado para status wifi
+            const amsStatus = data.ams || {}; // Para AMS
 
-             // <<< LOG: VERIFICAR ELEMENTOS >>>
-             console.log(`[DEBUG] Verificando elementos: overviewDiv=${overviewDiv ? 'OK' : 'NULL'}, progressDiv=${progressDiv ? 'OK' : 'NULL'}, progressBarSection=${progressBarSection ? 'OK' : 'NULL'}, tempsFansDiv=${tempsFansDiv ? 'OK' : 'NULL'}, amsDiv=${amsDiv ? 'OK' : 'NULL'}, taskDiv=${taskDiv ? 'OK' : 'NULL'}, otherDiv=${otherDiv ? 'OK' : 'NULL'}`);
+            // Atualizar Toolbar
+            // console.log("[DEBUG] updateUI: Atualizando toolbar...");
+            if (toolbarNozzleValue) toolbarNozzleValue.textContent = `${printStatus.nozzle_temper?.toFixed(1) ?? '--'} / ${printStatus.nozzle_target_temper?.toFixed(1) ?? '--'}`;
+            if (toolbarBedValue) toolbarBedValue.textContent = `${printStatus.bed_temper?.toFixed(1) ?? '--'} / ${printStatus.bed_target_temper?.toFixed(1) ?? '--'}`;
+            if (toolbarChamberItem && printStatus.chamber_temper !== undefined) {
+                toolbarChamberItem.style.display = 'inline';
+                if (toolbarChamberValue) toolbarChamberValue.textContent = printStatus.chamber_temper?.toFixed(1) ?? '--';
+            } else if (toolbarChamberItem) {
+                toolbarChamberItem.style.display = 'none';
+            }
 
-             clearIfExists(overviewDiv);
-             clearIfExists(progressDiv);
-             clearIfExists(progressBarSection);
-             clearIfExists(tempsFansDiv);
-             clearIfExists(amsDiv);
-             clearIfExists(taskDiv);
-             clearIfExists(otherDiv);
+            // Atualizar Gráfico
+            addDataToChart(data.system?.timestamp, printStatus.nozzle_temper, printStatus.bed_temper, printStatus.chamber_temper);
 
-             const loadingMsg = '<div class="loading">Aguardando primeira atualização da impressora...</div>';
-             const loadingMsgShort = 'Aguardando...';
+            // Construir HTML para as Colunas
+            // console.log("[DEBUG] updateUI: Construindo HTML para colunas...");
+            let progressHTML = '';
+            let progressBarHTML = '';
+            let overviewHTML = '';
+            let tempsFansHTML = '';
+            let amsHTML = '';
+            let taskHTML = '';
+            let otherHTML = '';
 
-             // --- Verifica Conexão/Dados --- (Modificado para clareza)
-             if (Object.keys(data).length === 0) {
-                 // Se NENHUM dado chegou ainda (nem print, nem info, etc.)
-                 console.log("[DEBUG] updateUI: Objeto de dados global vazio. Exibindo 'Aguardando dados do backend...'");
-                 const backendMsg = '<div class="loading">Aguardando dados do backend...</div>';
-                 if(overviewDiv) overviewDiv.innerHTML = backendMsg;
-                 if(progressDiv) progressDiv.innerHTML = backendMsg;
-                 if(tempsFansDiv) tempsFansDiv.innerHTML = backendMsg;
-                 if(amsDiv) amsDiv.innerHTML = backendMsg;
-                 if(taskDiv) taskDiv.innerHTML = backendMsg;
-                 if(otherDiv) otherDiv.innerHTML = backendMsg;
-                 // Limpar toolbar e valores atuais
-                 if (toolbarNozzleValue) toolbarNozzleValue.textContent = '-- / --';
-                 if (toolbarBedValue) toolbarBedValue.textContent = '-- / --';
-                 if (toolbarChamberValue) toolbarChamberValue.textContent = '--';
-                 if (toolbarChamberItem) toolbarChamberItem.style.display = 'none';
-                 // Removido current temp/fan spans pois os controles foram removidos
-                 // if (currentNozzleTempSpan) currentNozzleTempSpan.textContent = '--';
-                 // if (currentBedTempSpan) currentBedTempSpan.textContent = '--';
-                 if (currentFanSpeedSpan) currentFanSpeedSpan.textContent = '--';
-                 return; // Sai da função
-             }
-             else if (!data.print) {
-                // Se temos dados, mas não especificamente data.print (talvez só 'info' ou 'system')
-                // Ou se data.print está vazio após uma desconexão
-                console.log("[DEBUG] updateUI: Sem dados 'print' válidos. Exibindo 'Aguardando primeira atualização da impressora...'");
-                if(overviewDiv) overviewDiv.innerHTML = loadingMsg;
-                if(progressDiv) progressDiv.innerHTML = loadingMsg;
-                if(tempsFansDiv) tempsFansDiv.innerHTML = loadingMsg;
-                if(amsDiv) amsDiv.innerHTML = loadingMsg;
-                if(taskDiv) taskDiv.innerHTML = loadingMsg;
-                if(otherDiv) otherDiv.innerHTML = loadingMsg;
-                 // Limpar toolbar e valores atuais
-                 if (toolbarNozzleValue) toolbarNozzleValue.textContent = '-- / --';
-                 if (toolbarBedValue) toolbarBedValue.textContent = '-- / --';
-                 if (toolbarChamberValue) toolbarChamberValue.textContent = '--';
-                 if (toolbarChamberItem) toolbarChamberItem.style.display = 'none';
-                 // Removido current temp/fan spans pois os controles foram removidos
-                 // if (currentNozzleTempSpan) currentNozzleTempSpan.textContent = '--';
-                 // if (currentBedTempSpan) currentBedTempSpan.textContent = '--';
-                 if (currentFanSpeedSpan) currentFanSpeedSpan.textContent = '--';
-                return; // Sai da função
-             }
-
-             // Se chegou aqui, temos data.print válido
-             console.log("[DEBUG] updateUI: Processando dados print válidos...");
-             const printData = data.print;
-
-             // --- Atualizar Toolbar Temps ---
-             console.log("[DEBUG] updateUI: Atualizando toolbar...");
-             if (toolbarNozzleValue) toolbarNozzleValue.textContent = `${printData.nozzle_temper?.toFixed(1) ?? '-'} / ${printData.nozzle_target_temper?.toFixed(0) ?? '-'}`;
-             if (toolbarBedValue) toolbarBedValue.textContent = `${printData.bed_temper?.toFixed(1) ?? '-'} / ${printData.bed_target_temper?.toFixed(0) ?? '-'}`;
-             if (printData.chamber_temper !== undefined && printData.chamber_temper !== null) {
-                 if(toolbarChamberItem) toolbarChamberItem.style.display = 'inline';
-                 if(toolbarChamberValue) toolbarChamberValue.textContent = `${printData.chamber_temper?.toFixed(1) ?? '-'}`;
-             } else {
-                 if(toolbarChamberItem) toolbarChamberItem.style.display = 'none';
-             }
-
-             // --- Construir HTML diretamente (Abordagem innerHTML) ---
-             console.log("[DEBUG] updateUI: Construindo HTML para colunas...");
-
-             // Coluna Esquerda: Progresso e Visão Geral
-             if (progressDiv) {
-                 const percent = printData.mc_percent !== undefined ? printData.mc_percent : 0;
-                 const remainingMinutes = printData.mc_remaining_time;
-                 const layerNum = printData.layer_num || 0;
-                 const totalLayerNum = printData.total_layer_num || 0;
-                 let progressHTML = `<div class="status-item"><strong>Camada</strong><span class="status-value">${layerNum} / ${totalLayerNum}</span></div>`;
-                 progressHTML += `<div class="status-item"><strong>Tempo Restante</strong><span class="status-value">${formatTime(remainingMinutes)}</span></div>`;
-                 console.log("[DEBUG] progressHTML:", progressHTML);
+            // Bloco Progresso
+            if (progressDiv && progressBarSection) {
+                 const mcPercent = printStatus.mc_percent;
+                 const mcRemaining = formatTime(printStatus.mc_remaining_time);
+                 progressHTML += `<div class="status-item"><strong>Camada</strong><span class="status-value">${printStatus.layer_num ?? '--'} / ${printStatus.total_layer_num ?? '--'}</span></div>`;
+                 progressHTML += `<div class="status-item"><strong>Tempo Restante</strong><span class="status-value">${mcRemaining}</span></div>`;
+                 // console.log("[DEBUG] progressHTML:", progressHTML);
                  progressDiv.innerHTML = progressHTML;
 
-                 // Barra de Progresso
-                 if (progressBarSection) {
-                      const barHTML = `<div class="progress-bar-container">
-                                      <div class="progress-bar" style="width: ${percent}%;">${percent}%</div>
+                 if (mcPercent !== undefined && mcPercent !== null) {
+                     progressBarHTML = `<div class="progress-bar-container">
+                                      <div class="progress-bar" style="width: ${mcPercent}%;">${mcPercent}%</div>
                                    </div>`;
-                      console.log("[DEBUG] progressBarHTML:", barHTML);
-                     progressBarSection.innerHTML = barHTML;
+                     // console.log("[DEBUG] progressBarHTML:", progressBarHTML);
+                     progressBarSection.innerHTML = progressBarHTML;
                  }
-             }
-             if (overviewDiv) {
-                 const speedMap = ['N/A', 'Silencioso', 'Padrão', 'Sport', 'Ludicrous'];
-                 const speedLevelText = speedMap[printData.spd_lvl] || 'N/A';
-                 let overviewHTML = `<div class="status-item"><strong>Estado</strong><span class="status-value">${printData.gcode_state ?? '--'}</span></div>`;
-                 overviewHTML += `<div class="status-item"><strong>Velocidade</strong><span class="status-value">${speedLevelText} (${printData.spd_mag ?? '--'}%)</span></div>`;
-                 console.log("[DEBUG] overviewHTML:", overviewHTML);
-                 overviewDiv.innerHTML = overviewHTML;
-             }
-
-             // Coluna Direita: Temps/Fans, AMS, Tarefa, Outros
-             if (tempsFansDiv) {
-                 let tempsHTML = `<div class="status-item"><strong>Temperaturas (°C)</strong>
-                                    <p><span class="label">Bico:</span> <span class="value">${printData.nozzle_temper?.toFixed(1) ?? '-'} / ${printData.nozzle_target_temper?.toFixed(1) ?? '-'}</span></p>
-                                    <p><span class="label">Mesa:</span> <span class="value">${printData.bed_temper?.toFixed(1) ?? '-'} / ${printData.bed_target_temper?.toFixed(1) ?? '-'}</span></p>
-                                    ${printData.chamber_temper !== undefined ? `<p><span class="label">Câmara:</span> <span class="value">${printData.chamber_temper?.toFixed(1) ?? '-'}</span></p>` : ''}
-                                </div>`;
-                 let fansHTML = `<div class="status-item"><strong>Ventoinhas (%)</strong>
-                                   <p><span class="label">Peça:</span> <span class="value">${printData.cooling_fan_speed ?? '-'}</span></p>
-                                   <p><span class="label">Auxiliar:</span> <span class="value">${printData.big_fan1_speed ?? '-'}</span></p>
-                                   <p><span class="label">Câmara:</span> <span class="value">${printData.big_fan2_speed ?? '-'}</span></p>
-                                   <p><span class="label">Heatbreak:</span> <span class="value">${printData.heatbreak_fan_speed ?? '-'}</span></p>
-                                </div>`;
-                 console.log("[DEBUG] tempsFansHTML:", tempsHTML + fansHTML);
-                 tempsFansDiv.innerHTML = tempsHTML + fansHTML;
-
-                 // Atualizar valores atuais na seção Controle
-                 if (currentNozzleTempSpan) currentNozzleTempSpan.textContent = printData.nozzle_temper?.toFixed(1) ?? '--';
-                 if (currentBedTempSpan) currentBedTempSpan.textContent = printData.bed_temper?.toFixed(1) ?? '--';
-                 if (currentFanSpeedSpan) currentFanSpeedSpan.textContent = printData.cooling_fan_speed ?? '--';
-             }
-
-             if (amsDiv) {
-                 console.log("[DEBUG] updateUI: Processando AMS (HTML)...");
-                 let amsHTML = '';
-                 if (printData.ams && printData.ams.ams && printData.ams.ams.length > 0) {
-                     printData.ams.ams.forEach((amsUnit, amsIndex) => {
-                         amsHTML += `<div class="ams-unit">
-                                        <h3>AMS ${amsIndex + 1} <span class="label">(T:${amsUnit.temp || '-'}° H:${amsUnit.humidity || '-'}%)</span></h3>`;
-                         let traysHTML = '';
-                         if (amsUnit.tray && amsUnit.tray.length > 0) {
-                             amsUnit.tray.forEach(tray => {
-                                 if (!tray.cols && !tray.tray_type) return; // Pular bandejas vazias/inválidas
-                                 console.log(`[DEBUG] AMS Tray Loop: Processando Bandeja ID ${tray.id}`, tray); // Log da bandeja inteira
-                                 const trayId = tray.id !== undefined ? parseInt(tray.id) : -1;
-                                 const colorHex = tray.tray_color || 'FFFFFF00'; // Padrão branco transparente se ausente
-                                 console.log(`[DEBUG] AMS Tray Loop: colorHex bruto = ${tray.tray_color}, Usando = ${colorHex}`); // Log do HEX bruto e o que será usado
-                                 const colorRgb = hexToRgb(colorHex);
-                                 console.log(`[DEBUG] AMS Tray Loop: colorRgb convertido = ${colorRgb}`); // Log do RGB convertido
-                                 const type = tray.tray_type || 'N/A';
-                                 const profile = tray.tray_info_idx ? `(${tray.tray_info_idx})` : '';
-                                 const remaining = tray.remain !== undefined ? `${tray.remain}%` : '--';
-                                 const trayHTMLFragment = `<div class="ams-tray">
-                                                          <h4>Bandeja ${trayId >= 0 ? trayId + 1 : '?'}</h4>
-                                                          <p>
-                                                              <span class="filament-color" style="background-color: ${colorRgb};"><!-- COR APLICADA AQUI --></span>
-                                                              <span class="value">${type}</span> <span class="label">${profile}</span>
-                                                          </p>
-                                                          <p><span class="label">Restante:</span> <span class="value">${remaining}</span></p>
-                                                      </div>`;
-                                 console.log(`[DEBUG] AMS Tray Loop: HTML Gerado = ${trayHTMLFragment}`); // Log do HTML da bandeja
-                                 traysHTML += trayHTMLFragment;
-                             });
-                         }
-                         if (traysHTML === '') {
-                             traysHTML = '<p class="label">Nenhuma bandeja com filamento.</p>';
-                         }
-                         amsHTML += traysHTML + '</div>'; // Fecha ams-unit
-                     });
-                 } else {
-                     amsHTML = '<div class="loading">AMS não detectado.</div>';
-                 }
-                 console.log("[DEBUG] amsHTML:", amsHTML);
-                 amsDiv.innerHTML = amsHTML;
-             }
-
-             if(taskDiv) {
-                 console.log("[DEBUG] updateUI: Atualizando Task (HTML)...");
-                 const taskHTML = `<div class="status-item"><strong>Arquivo</strong><span class="status-value">${printData.gcode_file || '--'}</span></div>
-                                  <div class="status-item"><strong>Tarefa ID</strong><span class="status-value">${printData.task_id || '--'}</span></div>`;
-                 console.log("[DEBUG] taskHTML:", taskHTML);
-                 taskDiv.innerHTML = taskHTML;
-             }
-
-             if(otherDiv) {
-                 console.log("[DEBUG] updateUI: Atualizando Outros (HTML)...");
-                 const otherHTML = `<div class="status-item"><strong>Sinal Wifi</strong><span class="status-value">${printData.wifi_signal || '--'}</span></div>`;
-                 console.log("[DEBUG] otherHTML:", otherHTML);
-                 otherDiv.innerHTML = otherHTML;
-             }
-
-             // --- Adicionar dados ao Gráfico ---
-             console.log("[DEBUG] updateUI: Chamando addDataToChart...");
-             addDataToChart(Date.now(), printData.nozzle_temper, printData.bed_temper, printData.chamber_temper);
-             console.log("[DEBUG] updateUI: addDataToChart retornou.");
-
-             console.log("[DEBUG] updateUI: Atualização (parcial) concluída.");
-
-         } catch (error) {
-            console.error("[DEBUG] Erro DENTRO de updateUI:", error);
-            if (errorDiv) {
-                errorDiv.textContent = `Erro ao processar dados recebidos: ${error.message}`;
-                errorDiv.style.display = 'block';
             }
-         }
-     }
-    function fetchData() {
-        console.log("[DEBUG] fetchData chamada");
-        try {
-            fetch('/status')
-                .then(response => {
-                    if (!response.ok) {
-                        console.error(`[DEBUG] Erro HTTP ${response.status} ao buscar /status`);
-                        throw new Error(`Erro HTTP ${response.status}`);
+
+            // Bloco Visão Geral
+            if (overviewDiv) {
+                let printStage = printStatus.mc_print_stage || 'UNKNOWN';
+                // Traduzir estágios se necessário (opcional)
+                // const stageTranslations = { 'IDLE': 'Ocioso', 'PRINTING': 'Imprimindo', ... };
+                // printStage = stageTranslations[printStage] || printStage;
+                const printSpeedMap = { 1: 'Silencioso (50%)', 2: 'Padrão (100%)', 3: 'Sport (124%)', 4: 'Ludicrous (168%)' };
+                const printSpeed = printSpeedMap[printStatus.spd_lvl] || 'Desconhecido';
+                overviewHTML += `<div class="status-item"><strong>Estado</strong><span class="status-value">${printStage}</span></div>`;
+                overviewHTML += `<div class="status-item"><strong>Velocidade</strong><span class="status-value">${printSpeed}</span></div>`;
+                // console.log("[DEBUG] overviewHTML:", overviewHTML);
+                overviewDiv.innerHTML = overviewHTML;
+            }
+
+            // Bloco Temperaturas & Ventoinhas
+            if (tempsFansDiv) {
+                 tempsFansHTML += `<div class="status-item"><strong>Temperaturas (°C)</strong>
+                                    <p><span class="label">Bico:</span> <span class="value">${printStatus.nozzle_temper?.toFixed(1) ?? '--'} / ${printStatus.nozzle_target_temper?.toFixed(1) ?? '--'}</span></p>
+                                    <p><span class="label">Mesa:</span> <span class="value">${printStatus.bed_temper?.toFixed(1) ?? '--'} / ${printStatus.bed_target_temper?.toFixed(1) ?? '--'}</span></p>
+                                    ${printStatus.chamber_temper !== undefined ? `<p><span class="label">Câmara:</span> <span class="value">${printStatus.chamber_temper?.toFixed(1) ?? '--'}</span></p>` : ''}
+                                </div>`;
+                 tempsFansHTML += `<div class="status-item"><strong>Ventoinhas (%)</strong>
+                                   <p><span class="label">Peça:</span> <span class="value">${printStatus.cooling_fan_speed ?? '--'}</span></p>
+                                   <p><span class="label">Auxiliar:</span> <span class="value">${printStatus.heatbreak_fan_speed ?? '--'}</span></p>
+                                   <p><span class="label">Câmara:</span> <span class="value">${printStatus.big_fan1_speed ?? '--'}</span></p>
+                                   <p><span class="label">Heatbreak:</span> <span class="value">${printStatus.cooling_fan_speed ?? '--'}</span></p>
+                                </div>`;
+                 // console.log("[DEBUG] tempsFansHTML:", tempsFansHTML);
+                 tempsFansDiv.innerHTML = tempsFansHTML;
+            }
+
+            // Bloco AMS - Lógica Atualizada
+            if (amsDiv) {
+                let processedAMS = false;
+                let amsHTML = ''; // Initialize amsHTML here
+
+                try { // Added try block
+                    // 1. Tentar usar data.print.stg (provável para A1 Mini/AMS Lite)
+                    if (printStatus.stg && printStatus.stg.length > 0) {
+                        console.log("[DEBUG] Processando AMS via print.stg...");
+                        const trays = printStatus.stg;
+                        let traysHTML = trays.map((tray, trayIndex) => {
+                            const trayNum = parseInt(tray.id) + 1;
+                            const stgFilamentType = tray.tray_type || 'N/A';
+                            const stgFilamentSubType = tray.tray_sub_brands || '';
+                            const colorHexRaw = tray.cols?.[0] ?? '808080FF';
+                            const colorHex = colorHexRaw.length >= 6 ? colorHexRaw : '808080FF';
+                            const colorRgb = hexToRgb(colorHex);
+                            const remainingPercent = tray.remain !== undefined ? `${tray.remain}%` : '--';
+                            const stgSubTypeDisplay = stgFilamentSubType ? ` (${stgFilamentSubType})` : '';
+
+                            // Ler dados do DHT (assumindo que virão do backend)
+                            const dhtTemp = tray.dht_temp !== undefined && tray.dht_temp !== null ? `${tray.dht_temp.toFixed(1)}°C` : '--';
+                            const dhtHumidity = tray.dht_humidity !== undefined && tray.dht_humidity !== null ? `${tray.dht_humidity.toFixed(0)}%` : '--';
+
+                            if (tray.id >= 0 && tray.id <= 3) {
+                                return `<div class="ams-tray">
+                                            <h4>Slot ${trayNum}</h4>
+                                            <p>
+                                                <span class="filament-color" style="background-color: ${colorRgb};"></span>
+                                                <span class="value">${stgFilamentType}</span><span class="label">${stgSubTypeDisplay}</span>
+                                            </p>
+                                            <p><span class="label">Restante:</span> <span class="value">${remainingPercent}</span></p>
+                                            <p>
+                                                <span class="label">🌡️</span> <span class="value">${dhtTemp}</span>&nbsp;&nbsp;
+                                                <span class="label">💧</span> <span class="value">${dhtHumidity}</span>
+                                            </p>
+                                        </div>`;
+                            } else {
+                                console.log("[DEBUG] print.stg: Ignorando tray com ID inválido:", tray.id);
+                                return '';
+                            }
+                        }).join('');
+
+                        amsHTML = `<div class="ams-unit">
+                                       <h3>AMS Lite Status</h3>
+                                       ${traysHTML}
+                                   </div>`;
+                        processedAMS = true;
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("[DEBUG] Dados recebidos de /status:", data);
-                    updateUI(data);
-                })
-                .catch(error => {
-                    console.error('[DEBUG] Erro DENTRO do .then/.catch do fetch:', error);
-                    if (errorDiv) {
-                        errorDiv.textContent = `Falha ao buscar dados (${error.message}).`;
-                        errorDiv.style.display = 'block';
+                    // 2. Fallback para a estrutura aninhada (X1/P1?)
+                    else if (printStatus.ams && printStatus.ams.ams && printStatus.ams.ams.length > 0) {
+                        console.log("[DEBUG] Processando AMS via print.ams.ams[]...");
+                        amsHTML = printStatus.ams.ams.map((unit, index) => {
+                            const unitTemp = unit.temp !== undefined ? `${unit.temp}°C` : '--';
+                            const unitHumidity = unit.humidity !== undefined ? `${unit.humidity}%` : '--';
+                            let traysHTML = '';
+                            if (unit.tray && unit.tray.length > 0) {
+                                traysHTML = unit.tray.map((tray, trayIndex) => {
+                                    const trayNum = parseInt(tray.id) + 1;
+                                    const filamentType = tray.tray_type || 'N/A';
+                                    const filamentSubType = tray.tray_sub_brands || '';
+                                    const colorHexRaw = tray.cols?.[0] ?? '808080FF';
+                                    const colorHex = colorHexRaw.length >= 6 ? colorHexRaw : '808080FF';
+                                    const colorRgb = hexToRgb(colorHex);
+                                    const remainingPercent = tray.remain !== undefined ? `${tray.remain}%` : '--';
+                                    const subTypeDisplay = filamentSubType ? ` (${filamentSubType})` : '';
+
+                                    // Ler dados do DHT (assumindo que virão do backend)
+                                    const dhtTemp = tray.dht_temp !== undefined && tray.dht_temp !== null ? `${tray.dht_temp.toFixed(1)}°C` : '--';
+                                    const dhtHumidity = tray.dht_humidity !== undefined && tray.dht_humidity !== null ? `${tray.dht_humidity.toFixed(0)}%` : '--';
+
+                                    return `<div class="ams-tray">
+                                                <h4>Bandeja ${trayNum}</h4>
+                                                <p>
+                                                    <span class="filament-color" style="background-color: ${colorRgb};"></span>
+                                                    <span class="value">${filamentType}</span><span class="label">${subTypeDisplay}</span>
+                                                </p>
+                                                <p><span class="label">Restante:</span> <span class="value">${remainingPercent}</span></p>
+                                                <p>
+                                                    <span class="label">🌡️</span> <span class="value">${dhtTemp}</span>&nbsp;&nbsp;
+                                                    <span class="label">💧</span> <span class="value">${dhtHumidity}</span>
+                                                </p>
+                                            </div>`;
+                                }).join('');
+                            }
+                            return `<div class="ams-unit">
+                                        <h3>AMS ${index + 1} <span class="label">(T:${unitTemp} H:${unitHumidity})</span></h3>${traysHTML}</div>`;
+                        }).join('');
+                        processedAMS = true;
                     }
-                });
-        } catch (error) {
-            console.error('[DEBUG] Erro GERAL DENTRO de fetchData (antes do fetch):', error);
-             if (errorDiv) {
-                errorDiv.textContent = `Erro inesperado ao processar busca de dados: ${error.message}`;
+                } catch (e) {
+                    console.error("Erro ao processar dados AMS:", e);
+                    processedAMS = false; // Marcar como não processado em caso de erro
+                }
+
+                // 3. Atualizar o HTML final
+                if (processedAMS && amsHTML) { // Se processou com sucesso e tem HTML
+                    amsDiv.innerHTML = amsHTML;
+                } else {
+                    amsDiv.innerHTML = '<div class="loading">Nenhum AMS detectado ou sem dados válidos.</div>';
+                }
+            } // Fim do if (amsDiv)
+
+            // Bloco Informações da Tarefa
+            if (taskDiv) {
+                 // console.log("[DEBUG] updateUI: Atualizando Task (HTML)...");
+                 const gcodeFile = printStatus.gcode_file || 'N/A';
+                 const taskId = printStatus.task_id || '--';
+                 taskHTML += `<div class="status-item"><strong>Arquivo</strong><span class="status-value">${gcodeFile.split('/').pop()}</span></div>`; // Mostra só nome do arquivo
+                 taskHTML += `<div class="status-item"><strong>Tarefa ID</strong><span class="status-value">${taskId}</span></div>`;
+                 // console.log("[DEBUG] taskHTML:", taskHTML);
+                 taskDiv.innerHTML = taskHTML;
+            }
+
+            // Bloco Outros Status
+            if (otherDiv) {
+                // console.log("[DEBUG] updateUI: Atualizando Outros (HTML)...");
+                const wifiSignal = printStatus.wifi_signal ? `${printStatus.wifi_signal}dBm` : '--';
+                otherHTML += `<div class="status-item"><strong>Sinal Wifi</strong><span class="status-value">${wifiSignal}</span></div>`;
+                // Adicionar mais itens aqui se necessário
+                // console.log("[DEBUG] otherHTML:", otherHTML);
+                otherDiv.innerHTML = otherHTML;
+            }
+             // console.log("[DEBUG] updateUI: Atualização (parcial) concluída.");
+
+        } catch (e) {
+            console.error("Erro GRANDE dentro de updateUI:", e);
+            if (errorDiv) {
+                errorDiv.textContent = `Erro ao atualizar interface: ${e.message}`;
                 errorDiv.style.display = 'block';
+            } else {
+                 alert(`Erro fatal ao atualizar UI: ${e.message}`);
             }
         }
     }
+    function fetchData() {
+        // console.log("[DEBUG] fetchData chamada");
+        fetch("/status")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                 // console.log("[DEBUG] Dados recebidos de /status:", data);
+                if (Object.keys(data).length > 0) {
+                    updateUI(data);
+                } else {
+                     // console.log("[DEBUG] fetchData: Dados vazios recebidos, talvez inicializando...");
+                    // Poderia mostrar um estado de "Aguardando dados" se necessário
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao buscar dados:', error);
+                 if (errorDiv) {
+                    errorDiv.textContent = `Falha ao conectar ao backend. (${error.message})`;
+                    errorDiv.style.display = 'block';
+                 } else {
+                     alert(`Falha ao conectar ao backend: ${error.message}`);
+                 }
+                // Limpar divs para indicar erro?
+                // updateUI({}); // Chama com objeto vazio para limpar os campos
+            });
+    }
     function sendCommand(payload) {
-        console.log("[DEBUG] sendCommand: Recebido payload:", payload);
-        if (!payload || !payload.command) {
-            console.error("[DEBUG] sendCommand: Payload inválido.", payload);
-            if (commandStatusDiv) commandStatusDiv.textContent = 'Erro: Comando inválido.';
-            return;
-        }
-        if (commandStatusDiv) commandStatusDiv.textContent = 'Enviando...';
-        fetch('/command', {
+        // console.log("[DEBUG] sendCommand chamado com payload:", payload);
+        if (!commandStatusDiv) { console.error("Div #command-status não encontrada!"); return; }
+
+        commandStatusDiv.textContent = `Enviando comando ${payload.command}...`;
+        commandStatusDiv.style.color = 'var(--label-color)'; // Reset color
+
+        fetch("/command", {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(payload)
         })
         .then(response => {
-            console.log("[DEBUG] sendCommand: Resposta recebida do fetch.");
-            if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
+            if (!response.ok) {
+                // Tenta obter detalhes do erro do corpo da resposta JSON
+                 return response.json().then(errData => {
+                     throw new Error(errData.error || `Erro ${response.status}`);
+                 }).catch(() => {
+                      // Se o corpo não for JSON ou não tiver 'error', lança erro genérico
+                      throw new Error(`Erro HTTP ${response.status}`);
+                 });
+            }
             return response.json();
         })
         .then(data => {
-            console.log("[DEBUG] sendCommand: Resposta JSON:", data);
-            if (commandStatusDiv) {
-                commandStatusDiv.textContent = data.message || 'Comando enviado.';
-                commandStatusDiv.className = data.success ? 'status-success' : 'status-error';
+            // console.log("[DEBUG] Resposta do comando:", data);
+            if (data.success) {
+                commandStatusDiv.textContent = `Comando ${payload.command} enviado com sucesso.`;
+                commandStatusDiv.style.color = 'var(--success-color)';
+            } else {
+                commandStatusDiv.textContent = `Falha ao enviar ${payload.command}: ${data.error || 'Erro desconhecido'}`;
+                commandStatusDiv.style.color = 'var(--error-text)';
             }
             // Limpa a mensagem após alguns segundos
-            setTimeout(() => { if (commandStatusDiv) commandStatusDiv.textContent = ''; }, 5000);
+            setTimeout(() => {
+                if (commandStatusDiv.textContent.startsWith(`Comando ${payload.command}`) || commandStatusDiv.textContent.startsWith(`Falha ao enviar ${payload.command}`)) {
+                    commandStatusDiv.textContent = '';
+                }
+             }, 5000);
         })
         .catch(error => {
-            console.error('[DEBUG] Erro em sendCommand:', error);
-            if (commandStatusDiv) {
-                commandStatusDiv.textContent = `Erro ao enviar comando: ${error.message}`;
-                commandStatusDiv.className = 'status-error';
-            }
+            console.error('Erro ao enviar comando:', error);
+            commandStatusDiv.textContent = `Erro ao enviar comando: ${error.message}`;
+            commandStatusDiv.style.color = 'var(--error-text)';
         });
     }
 
@@ -620,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Navegação da Sidebar ---
     sidebarLinks.forEach(link => {
         link.addEventListener('click', (event) => {
-            console.log("[DEBUG] Clique na Sidebar detectado:", link.getAttribute('href'));
+            // console.log("[DEBUG] Clique na Sidebar detectado:", link.getAttribute('href'));
             event.preventDefault();
             const targetId = link.getAttribute('href').substring(1);
             contentSections.forEach(section => section.classList.remove('active'));
@@ -628,19 +671,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetSection) targetSection.classList.add('active');
             sidebarLinks.forEach(l => l.classList.remove('active'));
             link.classList.add('active');
-            console.log("[DEBUG] Sidebar: Classes 'active' atualizadas.");
+            // console.log("[DEBUG] Sidebar: Classes 'active' atualizadas.");
         });
     });
 
     // --- Botão de Tema ---
     if (themeToggleButton) {
         themeToggleButton.addEventListener('click', () => {
-            console.log("[DEBUG] Clique no botão de Tema detectado");
+            // console.log("[DEBUG] Clique no botão de Tema detectado");
             let currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
             let newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             localStorage.setItem('theme', newTheme);
             applyTheme(newTheme);
-             console.log("[DEBUG] Tema: applyTheme chamada após clique.");
+             // console.log("[DEBUG] Tema: applyTheme chamada após clique.");
         });
     } else { console.error("[DEBUG] Botão de tema não encontrado!"); }
 
@@ -651,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LEDs ---
     ledButtons.forEach(button => {
         button.addEventListener('click', () => {
-            console.log("[DEBUG] Botão LED clicado:", button.dataset);
+            // console.log("[DEBUG] Botão LED clicado:", button.dataset);
             const node = button.dataset.node; // Deve ser 'chamber_light' ou 'work_light'
             const mode = button.dataset.mode; // Deve ser 'on', 'off', ou 'flashing' (apenas work_light)
             let commandName = null;
@@ -663,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (commandName) {
                 const payload = { command: commandName, mode: mode };
-                console.log("[DEBUG] Payload para sendCommand (LED):", payload);
+                // console.log("[DEBUG] Payload para sendCommand (LED):", payload);
                 sendCommand(payload);
             } else {
                 console.error("[DEBUG] Nó de LED desconhecido:", node);
@@ -673,13 +716,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Temperatura/Fan ---
     if (setFanSpeedButton && fanSpeedInput) {
         setFanSpeedButton.addEventListener('click', () => {
-            console.log("[DEBUG] Botão 'Definir Fan' clicado.");
+            // console.log("[DEBUG] Botão 'Definir Fan' clicado.");
             const value = parseInt(fanSpeedInput.value, 10);
-            console.log(`[DEBUG] Valor lido do input Fan: ${value}`);
+            // console.log(`[DEBUG] Valor lido do input Fan: ${value}`);
             // A UI usa 0-100%, mas o backend agora espera 0-100 também para converter para Gcode
             if (!isNaN(value) && value >= 0 && value <= 100) {
                 const payload = { command: 'set_part_fan', value: value };
-                console.log("[DEBUG] Payload para sendCommand (Fan):", payload);
+                // console.log("[DEBUG] Payload para sendCommand (Fan):", payload);
                 sendCommand(payload);
             } else {
                 console.error("[DEBUG] Valor inválido para velocidade do fan:", fanSpeedInput.value);
@@ -726,32 +769,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else { console.warn("[DEBUG] Elementos de log de manutenção não encontrados."); }
 
+    const shareButton = document.getElementById('share-link-button');
+    const shareToken = document.body.dataset.shareToken;
+
+    if (shareButton && shareToken) {
+        shareButton.addEventListener('click', async () => {
+            const liveLink = `${window.location.origin}/live/${shareToken}`;
+            const shareData = {
+                title: 'SquidBu Live Print',
+                text: 'Acompanhe minha impressão 3D ao vivo!',
+                url: liveLink
+            };
+
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                    console.log('Link compartilhado com sucesso!');
+                    // Poderia adicionar um feedback visual aqui
+                } else {
+                    // Fallback para copiar para a área de transferência
+                    await navigator.clipboard.writeText(liveLink);
+                    alert('Link copiado para a área de transferência! (Compartilhamento nativo não suportado)'); 
+                    console.log('Link copiado para a área de transferência.');
+                }
+            } catch (err) {
+                console.error('Erro ao compartilhar/copiar link: ', err);
+                alert('Erro ao tentar compartilhar o link.');
+            }
+        });
+    } else if (shareButton && !shareToken) {
+        console.warn('Botão de compartilhamento encontrado, mas token não definido no config.json ou não passado para o template.');
+        shareButton.disabled = true;
+        shareButton.title = "Token de compartilhamento não configurado";
+    }
+
     // =======================================
     // INICIALIZAÇÃO FINAL
     // =======================================
-    console.log("[DEBUG] Iniciando inicialização final...");
+    // console.log("[DEBUG] Iniciando inicialização final...");
 
-    console.log("[DEBUG] Aplicando tema salvo...");
+    // console.log("[DEBUG] Aplicando tema salvo...");
     const savedTheme = localStorage.getItem('theme') || 'light';
     applyTheme(savedTheme);
-    console.log("[DEBUG] Tema salvo aplicado.");
+    // console.log("[DEBUG] Tema salvo aplicado.");
 
-    console.log("[DEBUG] Inicializando câmera (se houver)...");
-    if (cameraFeed) { /* ... (inicialização câmera - manter sem log interno por ora) ... */ }
-    console.log("[DEBUG] Inicialização da câmera concluída (ou ignorada).");
+    // console.log("[DEBUG] Inicializando câmera (se houver)...");
+    if (cameraFeed) {
+         setInterval(() => {
+             cameraFeed.src = "/camera_proxy" + "?t=" + new Date().getTime();
+         }, 30000);
+     }
+    // console.log("[DEBUG] Inicialização da câmera concluída (ou ignorada).");
 
-    console.log("[DEBUG] Chamando initializeChart...");
+    // console.log("[DEBUG] Chamando initializeChart...");
     initializeChart();
-    console.log("[DEBUG] initializeChart retornou.");
+    // console.log("[DEBUG] initializeChart retornou.");
 
-    console.log("[DEBUG] Chamando fetchData inicial...");
+    // console.log("[DEBUG] Chamando fetchData inicial...");
     fetchData();
     fetchMaintenanceData();
-    console.log("[DEBUG] fetchData inicial retornou (ou erro capturado).");
+    // console.log("[DEBUG] fetchData inicial retornou (ou erro capturado).");
 
-    console.log("[DEBUG] Configurando setInterval...");
+    // console.log("[DEBUG] Configurando setInterval...");
     setInterval(fetchData, 3000);
-    console.log("[DEBUG] setInterval configurado.");
+    // console.log("[DEBUG] setInterval configurado.");
 
-    console.log("[DEBUG] Inicialização final concluída, fetchData agendado.");
+    // console.log("[DEBUG] Inicialização final concluída, fetchData agendado.");
 });

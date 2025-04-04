@@ -140,14 +140,13 @@ body {
     border-bottom: 1px solid var(--border-color);
     box-shadow: 0 1px 3px var(--shadow-color);
     display: flex;
-    /* justify-content: space-between; */ /* Removido para alinhar menu à esquerda */
     align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 1010; /* Mantido, sidebar ficará acima se precisar */
+    z-index: 1010;
     font-size: 0.9em;
     width: 100%;
     box-sizing: border-box;
+    position: sticky;
+    top: 0;
 }
 
 /* Estilo para o botão de menu */
@@ -181,6 +180,11 @@ body {
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s;
+}
+
+/* Adicionar esta regra para espaçamento */
+#toolbar #theme-toggle {
+    margin-left: 10px;
 }
 
 #toolbar button:hover {
@@ -295,7 +299,6 @@ canvas#temperatureChart {
 /* Estilos para mostrar/ocultar seções */
 .content-section {
     display: none; /* Oculto por padrão */
-    padding-top: 60px; /* Espaço para a toolbar fixa */
 }
 
 .content-section.active {
@@ -561,4 +564,13 @@ body.dark-theme .chartjs-render-monitor {
     padding: 6px 10px;
     font-size: 0.85em;
     margin-left: auto; /* Empurra para a direita se houver espaço */
+}
+
+/* Estilos gerais (h1, h2, etc.) */
+h1, h2 {
+    color: var(--header-color);
+    border-bottom: 2px solid var(--border-light-color);
+    padding-bottom: 10px;
+    /* Esta regra geral pode precisar ser ajustada se ainda conflitar,
+       mas a remoção da borda/padding no H1 do logo deve ajudar */
 } 

@@ -4,5 +4,20 @@
         "prints": 0,
         "last_updated": null
     },
-    "logs": []
+    "logs": [
+        {
+            "timestamp": "2025-03-14 07:00:00",
+            "task": "Lubrifica\u00e7\u00e3o Eixo Z",
+            "hours_at_log": 0,
+            "prints_at_log": 0,
+            "notes": "primeira lubrificacao"
+        },
+        {
+            "timestamp": "2025-03-14 07:00:00",
+            "task": "Lubrifica\u00e7\u00e3o Eixo X/Y",
+            "hours_at_log": 0,
+            "prints_at_log": 0,
+            "notes": "primeira lubrificacao"
+        }
+    ]
 }
