@@ -3,692 +3,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Impressora Bambu</title>
+    <title>SquidBu - Monitor Bambu</title>
     <!-- Inclui Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- O CSS está embutido na tag <style> abaixo -->
-    <style>
-        :root {
-            /* Tema Claro (Padrão) */
-            --bg-color: #f4f4f4;
-            --text-color: #333;
-            --container-bg: #fff;
-            --item-bg: #f9f9f9;
-            --item-alt-bg: #f0f0f0;
-            --border-color: #ddd;
-            --border-light-color: #eee;
-            --link-color: #007bff;
-            --header-color: #333;
-            --label-color: #666;
-            --value-color: #000;
-            --success-color: #4CAF50;
-            --error-bg: #fdd;
-            --error-border: #e74c3c;
-            --error-text: #e74c3c;
-            --button-bg: #e0e0e0;
-            --button-text: #333;
-            --shadow-color: rgba(0,0,0,0.1);
-        }
-
-        body.dark-theme {
-            /* Tema Escuro */
-            --bg-color: #000000; /* Alterado para preto */
-            --text-color: #dee2e6;
-            --container-bg: #181818; /* Alterado para cinza muito escuro */
-            --item-bg: #282828; /* Alterado para cinza escuro */
-            --item-alt-bg: #383838; /* Ajustado para contraste */
-            --border-color: #444; /* Ajustado para contraste */
-            --border-light-color: #333; /* Ajustado para contraste */
-            --link-color: #77b3ff; /* Ajustado para contraste */
-            --header-color: #e9ecef;
-            --label-color: #adb5bd;
-            --value-color: #f8f9fa;
-            --success-color: #28a745;
-            --error-bg: #402024; /* Ajustado para contraste */
-            --error-border: #a02c38; /* Ajustado para contraste */
-            --error-text: #f8d7da;
-            --button-bg: #444; /* Ajustado */
-            --button-text: #f8f9fa;
-            --shadow-color: rgba(255,255,255,0.05); /* Sombra mais sutil */
-        }
-
-        body {
-            font-family: sans-serif;
-            margin: 0; /* Remover margem padrão */
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        #toolbar {
-            background-color: var(--item-bg);
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border-color);
-            box-shadow: 0 1px 3px var(--shadow-color);
-            display: flex;
-            justify-content: space-between; /* Alinha temps à esquerda, botão à direita */
-            align-items: center;
-            position: sticky; /* Fixa no topo */
-            top: 0;
-            z-index: 1010; /* Acima do container */
-            font-size: 0.9em; /* Tamanho de fonte menor para a toolbar */
-        }
-        #toolbar-temps span { /* Estilo para cada item de temperatura */
-            margin-right: 15px; /* Espaço entre os itens */
-            white-space: nowrap; /* Evita quebra de linha */
-        }
-         #toolbar button {
-            background-color: var(--button-bg);
-            color: var(--button-text);
-            border: 1px solid var(--border-color);
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-         }
-         #toolbar button:hover {
-            opacity: 0.9;
-         }
-
-        .container {
-            background-color: var(--container-bg);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            max-width: 1200px;
-            margin: 20px auto; /* Adiciona margem superior */
-        }
-        h1, h2 {
-            color: var(--header-color);
-            border-bottom: 2px solid var(--border-light-color);
-            padding-bottom: 10px;
-        }
-        h2 { margin-top: 0; margin-bottom: 15px; font-size: 1.2em;}
-        .status-grid, .ams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
-        .status-item, .ams-unit, .ams-tray {
-            background-color: var(--item-bg);
-            border: 1px solid var(--border-color);
-            padding: 15px;
-            border-radius: 5px;
-         }
-        .status-item strong { display: block; margin-bottom: 5px; color: var(--label-color); font-size: 0.9em; }
-        .status-item p { margin: 8px 0; }
-        .status-value { font-size: 1.1em; font-weight: bold; color: var(--value-color); }
-        #error-message {
-            color: var(--error-text);
-            background-color: var(--error-bg);
-            border: 1px solid var(--error-border);
-            padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 15px; text-align: center; }
-        .progress-bar-container { width: 100%; background-color: #e0e0e0; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-        .progress-bar { height: 24px; background-color: var(--success-color); width: 0%; border-radius: 4px; text-align: center; line-height: 24px; color: white; font-weight: bold; transition: width 0.5s ease-in-out; white-space: nowrap; }
-        .ams-unit h3, .ams-tray h4 { margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid var(--border-light-color); padding-bottom: 5px; }
-        .filament-color { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px; vertical-align: middle; border: 1px solid #555; }
-        .ams-tray p { margin: 5px 0; }
-        .loading { text-align: center; padding: 20px; color: var(--label-color); }
-        .label { font-weight: normal; color: var(--label-color); }
-        .value { font-weight: bold; color: var(--value-color); }
-
-        /* Layout de Colunas */
-        #layout-container {
-            display: flex;
-            flex-wrap: wrap; /* Permite quebrar em telas menores se necessário */
-            gap: 20px; /* Espaço entre as colunas */
-        }
-        #left-column {
-            flex: 1; /* Coluna esquerda */
-            min-width: 200px; /* Reduzido um pouco */
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        #center-column {
-            flex: 3; /* Coluna central mais larga */
-            min-width: 350px;
-            display: flex; /* Organiza câmera e gráfico internamente */
-            flex-direction: column;
-            gap: 20px;
-        }
-        #right-column {
-            flex: 1; /* Coluna direita */
-            min-width: 220px; /* Reduzido um pouco */
-            display: flex; /* Organiza Temps/Fans e AMS */
-            flex-direction: column;
-            gap: 20px;
-        }
-        /* Ajuste para os grids nas colunas laterais */
-        #left-column .status-grid,
-        #right-column .status-grid, /* Aplicar também ao grid de Temps/Fans */
-        #right-column #ams-data {
-             grid-template-columns: 1fr; /* Força uma única coluna */
-        }
-        /* Estilo para a imagem da câmera */
-        #camera-feed {
-            width: 100%;
-            max-width: 640px; /* Limita um pouco a largura máxima */
-            height: auto;
-            border: 1px solid var(--border-color);
-            background-color: var(--item-alt-bg); /* Cor de fundo enquanto carrega */
-            transform: rotate(180deg); /* Adiciona rotação */
-        }
-        /* Container do gráfico para manter proporção */
-        #temp-chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-            background-color: var(--item-bg); /* Fundo para o gráfico */
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 10px;
-        }
-        /* Ajustes Chart.js para tema escuro */
-        body.dark-theme .chartjs-legend ul li span {
-            color: var(--text-color);
-        }
-        body.dark-theme .chartjs-tooltip-body span {
-            color: var(--text-color); /* Ajuste se necessário */
-        }
-        body.dark-theme .chartjs-render-monitor { /* Evita flicker branco */
-            background-color: var(--item-bg);
-        }
-        /* Ajustar cores de eixos/grades se necessário */
-        /* Chart.defaults.color = 'var(--text-color)'; // Pode ser global ou por opções */
-
-        /* Media Query para Telas Menores (Responsividade) */
-        @media (max-width: 768px) {
-            #layout-container {
-                flex-direction: column; /* Empilha as colunas */
-            }
-            /* Opcional: Ajustar min-width se necessário, mas flex: 1 já deve funcionar */
-            #left-column,
-            #center-column,
-            #right-column {
-                 min-width: unset; /* Remove largura mínima fixa */
-                 width: 100%; /* Faz ocupar toda a largura disponível */
-            }
-            .container {
-                margin: 10px; /* Reduz margens laterais em telas pequenas */
-                padding: 15px;
-            }
-            h1 {
-                font-size: 1.5em;
-            }
-            h2 {
-                font-size: 1.1em;
-            }
-        }
-
-    </style>
+    <!-- Adicionar Date adapter e dependência DEPOIS do Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Link para o CSS externo -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div id="toolbar">
-        <div id="toolbar-temps">
-            <span>🔥 <span id="toolbar-nozzle-value">-- / --</span> °C</span>
-            <span>⏹️ <span id="toolbar-bed-value">-- / --</span> °C</span>
-            <span id="toolbar-chamber-item" style="display: none;">🌡️ <span id="toolbar-chamber-value">--</span> °C</span>
-        </div>
-        <button id="theme-toggle">🌙 Tema Escuro</button>
-    </div>
+    <nav id="sidebar">
+        <h2>SquidBu</h2>
+        <ul>
+            <li><a href="#dashboard-content" class="active"><span class="link-text">Dashboard</span></a></li>
+            <li><a href="#controle-content"><span class="link-text">Controle</span></a></li>
+            <li><a href="#energia-content"><span class="link-text">Energia</span></a></li>
+            <li><a href="#manutencao-content"><span class="link-text">Manutenção</span></a></li>
+        </ul>
+    </nav>
 
-    <div class="container">
-        <h1>Monitor Impressora Bambu Lab</h1>
-        <div id="error-message" style="display: none;"></div>
-
-        <div id="layout-container">
-            <div id="left-column">
-                <div> <!-- Bloco Progresso -->
-                    <h2>Progresso da Impressão</h2>
-                    <div id="status-progress" class="status-grid">
-                         <div class="loading">Carregando...</div>
-                    </div>
-                    <div id="progress-bar-section" style="margin-top: 15px;"></div>
-                </div>
-                <div> <!-- Bloco Temperaturas/Ventoinhas -->
-                    <h2>Temperaturas & Ventoinhas</h2>
-                    <div id="status-temps-fans" class="status-grid">
-                        <div class="loading">Carregando...</div>
-                    </div>
-                </div>
-                 <div> <!-- Bloco Visão Geral (Movido para cá) -->
-                    <h2>Visão Geral</h2>
-                    <div id="status-overview" class="status-grid">
-                        <div class="loading">Carregando...</div>
-                    </div>
-                </div>
+    <main id="main-content">
+        <div id="toolbar">
+            <div id="toolbar-temps">
+                <span>🔥 <span id="toolbar-nozzle-value">-- / --</span> °C</span>
+                <span>⏹️ <span id="toolbar-bed-value">-- / --</span> °C</span>
+                <span id="toolbar-chamber-item" style="display: none;">🌡️ <span id="toolbar-chamber-value">--</span> °C</span>
             </div>
-
-            <div id="center-column">
-                <div> <!-- Bloco da Câmera -->
-                    <h2>Câmera</h2>
-                    <img id="camera-feed" src="" alt="Camera Feed - Carregando...">
-                </div>
-                <div> <!-- Bloco do Gráfico -->
-                    <h2>Histórico de Temperaturas</h2>
-                    <div id="temp-chart-container">
-                        <canvas id="tempHistoryChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div id="right-column">
-                 <!-- Bloco Temperaturas/Ventoinhas Removido daqui -->
-                <div> <!-- Bloco AMS -->
-                    <h2>AMS</h2>
-                    <div id="ams-data" class="ams-grid">
-                         <div class="loading">Carregando...</div>
-                    </div>
-                </div>
-            </div>
+            <button id="theme-toggle">🌙 Tema Escuro</button>
         </div>
 
-    </div>
+        <!-- Seção Dashboard -->
+        <section id="dashboard-content" class="content-section active">
+            <div class="container">
+                <!-- Conteúdo original do container (layout de 3 colunas) -->
+                <h1>Monitor Impressora Bambu Lab</h1>
+                <div id="error-message" style="display: none;"></div>
 
-    <script>
-        // Obter referências aos elementos principais (pode ser feito aqui)
-        const overviewDiv = document.getElementById('status-overview');
-        const progressDiv = document.getElementById('status-progress');
-        const progressBarSection = document.getElementById('progress-bar-section');
-        const tempsFansDiv = document.getElementById('status-temps-fans');
-        const amsDiv = document.getElementById('ams-data');
-        const errorDiv = document.getElementById('error-message');
-        const cameraFeed = document.getElementById('camera-feed');
-        // Refs para valores na toolbar
-        const toolbarNozzleValue = document.getElementById('toolbar-nozzle-value');
-        const toolbarBedValue = document.getElementById('toolbar-bed-value');
-        const toolbarChamberItem = document.getElementById('toolbar-chamber-item'); // Span que contém o ícone+valor da câmara
-        const toolbarChamberValue = document.getElementById('toolbar-chamber-value');
+                <div id="layout-container">
+                    <div id="left-column">
+                        <div> <!-- Bloco Progresso -->
+        <h2>Progresso da Impressão</h2>
+        <div id="status-progress" class="status-grid">
+             <div class="loading">Carregando...</div>
+        </div>
+        <div id="progress-bar-section" style="margin-top: 15px;"></div>
+                        </div>
+                         <div> <!-- Bloco Temperaturas/Ventoinhas (MOVIDO) -->
+        <h2>Temperaturas & Ventoinhas</h2>
+        <div id="status-temps-fans" class="status-grid">
+             <div class="loading">Carregando...</div>
+        </div>
+                        </div>
+                         <div> <!-- Bloco Visão Geral (POSIÇÃO AJUSTADA) -->
+                            <h2>Visão Geral</h2>
+                             <div id="status-overview" class="status-grid">
+                                <div class="loading">Carregando...</div>
+                            </div>
+                        </div>
+                         <div> <!-- Bloco Outros Status (MOVIDO) -->
+                            <h2>Outros Status</h2>
+                             <div id="status-other" class="status-grid">
+                                <div class="loading">Carregando...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="center-column">
+                        <div>
+                            <h2>Feed da Câmera</h2>
+                            <img id="camera-feed" src="{{ url_for('camera_proxy') }}" alt="Camera Feed"/>
+                        </div>
+                        <div id="temp-chart-container">
+                            <h2>Histórico de Temperatura</h2>
+                            <canvas id="temperatureChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="right-column">
+                         <!-- Bloco Temperaturas/Ventoinhas REMOVIDO daqui -->
+                        <div> <!-- Bloco AMS -->
+                            <h2>AMS Status</h2>
+        <div id="ams-data" class="ams-grid">
+             <div class="loading">Carregando...</div>
+                            </div>
+                        </div>
+                        <div> <!-- Bloco Informações da Tarefa -->
+                            <h2>Informações da Tarefa</h2>
+                            <div id="status-task" class="status-grid">
+                                <div class="loading">Carregando...</div>
+                            </div>
+                        </div>
+                         <!-- Bloco Outros Status REMOVIDO daqui -->
+                    </div>
+                </div>
+                 <!-- Fim do conteúdo original -->
+            </div>
+        </section>
 
-        // Declarar variáveis do gráfico aqui, mas inicializar depois que o DOM carregar
-        let chartCtx = null;
-        let tempChart = null;
-        const MAX_DATA_POINTS = 60;
-        const chartData = {
-            labels: [], // Timestamps ou contador
-            datasets: [
-                {
-                    label: 'Bico (°C)',
-                    data: [],
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                    tension: 0.1
-                },
-                {
-                    label: 'Mesa (°C)',
-                    data: [],
-                    borderColor: 'rgb(54, 162, 235)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    tension: 0.1
-                },
-                {
-                    label: 'Câmara (°C)',
-                    data: [],
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                    tension: 0.1,
-                    hidden: true // Escondido por padrão se não houver câmara?
-                }
-            ]
-        };
+        <!-- Seção Controle -->
+        <section id="controle-content" class="content-section">
+            <div class="container">
+                <h1>Controle da Impressora</h1>
 
-        // --- Funções (podem ser definidas antes do DOM carregar) ---
+                <div id="control-grid">
 
-        function initializeChart() {
-            if (tempChart) {
-                tempChart.destroy();
-            }
-            // Obter contexto SÓ AQUI dentro, quando o DOM está pronto
-            chartCtx = document.getElementById('tempHistoryChart')?.getContext('2d');
-            if (!chartCtx) {
-                console.error("Não foi possível obter o contexto 2D do canvas #tempHistoryChart");
-                return;
-            }
-            tempChart = new Chart(chartCtx, {
-                type: 'line',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: false, // Não forçar o eixo Y a começar em 0
-                            suggestedMin: 20, // Sugere um mínimo razoável
-                             title: {
-                                display: true,
-                                text: 'Temperatura (°C)'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Tempo'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    },
-                    animation: {
-                        duration: 0 // Desabilita animação para atualizações mais suaves
-                    }
-                }
-            });
-        }
+                    <!-- Controles de Impressão -->
+                    <div class="control-group">
+                        <h2>Impressão</h2>
+                        <button class="control-button" data-command="resume">▶️ Retomar</button>
+                        <button class="control-button" data-command="pause">⏸️ Pausar</button>
+                        <button class="control-button danger" data-command="stop">⏹️ Parar</button>
+                    </div>
 
-        function addDataToChart(timestamp, nozzleTemp, bedTemp, chamberTemp) {
-            if (!tempChart) return;
+                    <!-- Controle de Velocidade -->
+                    <div class="control-group">
+                        <h2>Velocidade</h2>
+                        <select id="speed-select" class="control-select">
+                            <option value="1">Silencioso (50%)</option>
+                            <option value="2" selected>Padrão (100%)</option>
+                            <option value="3">Sport (124%)</option>
+                            <option value="4">Ludicrous (168%)</option>
+                        </select>
+                        <button id="set-speed-button" class="control-button">Definir Velocidade</button>
+                    </div>
 
-            // Adiciona novo label (timestamp formatado ou apenas um contador)
-            const timeLabel = new Date(timestamp).toLocaleTimeString(); // Ou usar um contador simples
-            chartData.labels.push(timeLabel);
+                    <!-- Controle de LEDs -->
+                    <div class="control-group">
+                        <h2>Luzes</h2>
+                        <div>
+                            <label>Luz da Câmara:</label>
+                            <button class="control-button led-button" data-node="chamber_light" data-mode="on">ON</button>
+                            <button class="control-button led-button" data-node="chamber_light" data-mode="off">OFF</button>
+                        </div>
+                         <div>
+                            <label>Luz de Trabalho:</label>
+                            <button class="control-button led-button" data-node="work_light" data-mode="on">ON</button>
+                            <button class="control-button led-button" data-node="work_light" data-mode="off">OFF</button>
+                            <button class="control-button led-button" data-node="work_light" data-mode="flashing">PISCAR</button>
+                        </div>
+                    </div>
 
-            // Adiciona novos dados de temperatura
-            chartData.datasets[0].data.push(nozzleTemp);
-            chartData.datasets[1].data.push(bedTemp);
-            chartData.datasets[2].data.push(chamberTemp);
+                    <!-- Controle de Temperatura (Substituindo G-Code) -->
+                    <div class="control-group wide temperature-control">
+                        <h2>Controle de Temperatura & Fan</h2>
 
-            // Garante que o dataset da câmara só é visível se houver dados
-            if (chamberTemp !== null && chamberTemp !== undefined) {
-                 chartData.datasets[2].hidden = false;
-            } else {
-                // Se não houver dados de câmara nesta atualização, preenche com null para não ligar pontos
-                 chartData.datasets[2].data[chartData.datasets[2].data.length - 1] = null;
-                 // Mantém a visibilidade como está (pode ter sido habilitada antes)
-            }
+                        <!-- Controle do Bico (Comentado) -->
+                        <!--
+                        <div class="temp-fan-control">
+                            <label for="nozzle-temp-input">Bico (°C):</label>
+                            <span class="current-value">Atual: <span id="current-nozzle-temp">--</span>°C</span>
+                            <input type="number" id="nozzle-temp-input" class="temp-fan-input" placeholder="Ex: 220">
+                            <button id="set-nozzle-temp-button" class="control-button apply-button">Aplicar Bico</button>
+                        </div>
+                        -->
 
-            // Remove pontos de dados antigos se exceder o limite
-            while (chartData.labels.length > MAX_DATA_POINTS) {
-                chartData.labels.shift();
-                chartData.datasets.forEach(dataset => {
-                    dataset.data.shift();
-                });
-            }
+                        <!-- Controle da Mesa (Comentado) -->
+                        <!--
+                        <div class="temp-fan-control">
+                            <label for="bed-temp-input">Mesa (°C):</label>
+                             <span class="current-value">Atual: <span id="current-bed-temp">--</span>°C</span>
+                            <input type="number" id="bed-temp-input" class="temp-fan-input" placeholder="Ex: 65">
+                            <button id="set-bed-temp-button" class="control-button apply-button">Aplicar Mesa</button>
+                        </div>
+                        -->
 
-            // Atualiza o gráfico
-            tempChart.update();
-        }
+                        <!-- Controle do Fan de Peça -->
+                        <div class="temp-fan-control">
+                            <label for="fan-speed-input">Fan Peça (%):</label>
+                            <span class="current-value">Atual: <span id="current-fan-speed">--</span>%</span>
+                            <input type="number" id="fan-speed-input" class="temp-fan-input" placeholder="0-100" min="0" max="100">
+                            <button id="set-fan-speed-button" class="control-button apply-button">Aplicar Fan</button>
+                        </div>
 
-        function createStatusItem(label, value, unit = '') {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'status-item';
-            itemDiv.innerHTML = `<strong>${label}</strong><span class="status-value">${value !== undefined && value !== null ? value : 'N/A'}${unit}</span>`;
-            return itemDiv;
-        }
+                    </div>
 
-        function formatTime(minutes) {
-            if (minutes === undefined || minutes === null || minutes <= 0) return 'N/A';
-            const h = Math.floor(minutes / 60);
-            const m = minutes % 60;
-            let timeString = '';
-            if (h > 0) timeString += `${h}h `;
-            timeString += `${m}min`;
-            return timeString;
-        }
+                </div> <!-- Fim control-grid -->
 
-        function hexToRgb(hex) {
-            if (!hex || hex.length < 6) return 'rgb(200, 200, 200)'; // Cor padrão para inválido/ausente
-            const bigint = parseInt(hex.startsWith('#') ? hex.substring(1, 7) : hex.substring(0, 6), 16);
-            const r = (bigint >> 16) & 255;
-            const g = (bigint >> 8) & 255;
-            const b = bigint & 255;
-            return `rgb(${r}, ${g}, ${b})`;
-        }
+                 <div id="command-status" style="margin-top: 20px; text-align: center;"></div>
 
+            </div>
+        </section>
 
-        function updateStatus() {
-            fetch('/status')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erro HTTP ${response.status} ao buscar /status`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (!errorDiv) {
-                        console.error("Elemento #error-message não encontrado!");
-                        return; // Impede a execução se o elemento de erro não existir
-                    }
-                    errorDiv.style.display = 'none'; // Esconde erro se sucesso
+        <!-- Seção Energia -->
+        <section id="energia-content" class="content-section">
+             <div class="container">
+                <h1>Controle de Energia</h1>
+                <!-- Conteúdo de Energia virá aqui -->
+                 <div class="loading">Em desenvolvimento...</div>
+            </div>
+        </section>
 
-                    // Verifica se os elementos existem antes de tentar limpar
-                    if(overviewDiv) overviewDiv.innerHTML = ''; else console.error("#status-overview não encontrado");
-                    if(progressDiv) progressDiv.innerHTML = ''; else console.error("#status-progress não encontrado");
-                    if(progressBarSection) progressBarSection.innerHTML = ''; else console.error("#progress-bar-section não encontrado");
-                    if(tempsFansDiv) tempsFansDiv.innerHTML = ''; else console.error("#status-temps-fans não encontrado");
-                    if(amsDiv) amsDiv.innerHTML = ''; else console.error("#ams-data não encontrado");
+        <!-- Seção Manutenção -->
+        <section id="manutencao-content" class="content-section">
+            <div class="container">
+                <h1>Manutenção</h1>
 
-                    if (Object.keys(data).length === 0 || !data.print) {
-                         if(overviewDiv) overviewDiv.innerHTML = '<div class="loading">Aguardando dados da impressora...</div>';
-                         if(progressDiv) progressDiv.innerHTML = '<div class="loading">Carregando...</div>';
-                         if(tempsFansDiv) tempsFansDiv.innerHTML = '<div class="loading">Carregando...</div>';
-                         if(amsDiv) amsDiv.innerHTML = '<div class="loading">Carregando...</div>';
+                <div class="maintenance-grid">
+                    <!-- Totais -->
+                    <div class="maintenance-group totals-group">
+                        <h2>Totais da Impressora</h2>
+                        <div class="totals-display">
+                            <p><span class="label">Horas de Impressão:</span> <span id="total-hours">--</span></p>
+                            <p><span class="label">Total de Impressões:</span> <span id="total-prints">--</span></p>
+                            <p><span class="label">Última Atualização:</span> <span id="totals-last-updated">--</span></p>
+                        </div>
+                        <div class="totals-update">
+                             <label for="update-hours-input">Atualizar Horas:</label>
+                             <input type="number" id="update-hours-input" step="0.1" min="0" placeholder="Ex: 150.5">
+                             <label for="update-prints-input">Atualizar Impressões:</label>
+                             <input type="number" id="update-prints-input" step="1" min="0" placeholder="Ex: 30">
+                             <button id="update-totals-button" class="control-button">Salvar Totais</button>
+                             <div id="totals-status" class="status-message"></div>
+                        </div>
+                    </div>
 
-                        // Limpa toolbar temps em caso de erro/sem dados
-                        if (toolbarNozzleValue) toolbarNozzleValue.textContent = '-- / --';
-                        if (toolbarBedValue) toolbarBedValue.textContent = '-- / --';
-                        if (toolbarChamberValue) toolbarChamberValue.textContent = '--';
-                        if (toolbarChamberItem) toolbarChamberItem.style.display = 'none';
+                    <!-- Registrar Nova Manutenção -->
+                    <div class="maintenance-group log-group">
+                        <h2>Registrar Manutenção</h2>
+                        <div class="log-form">
+                            <label for="maintenance-task">Tarefa:</label>
+                            <select id="maintenance-task">
+                                <option value="Lubrificação Eixo X/Y">Lubrificação Eixo X/Y (Mensal)</option>
+                                <option value="Lubrificação Eixo Z">Lubrificação Eixo Z (Trimestral)</option>
+                                <option value="Limpeza Geral">Limpeza Geral</option>
+                                <option value="Verificação Correias">Verificação Correias</option>
+                                <option value="Troca Bico">Troca Bico</option>
+                                <option value="Outro">Outro (descreva nas notas)</option>
+                            </select>
 
-                        return;
-                    }
+                            <label for="maintenance-notes">Observações:</label>
+                            <textarea id="maintenance-notes" rows="3" placeholder="Detalhes adicionais..."></textarea>
 
-                    const printData = data.print;
+                            <button id="log-maintenance-button" class="control-button">Registrar</button>
+                            <div id="log-status" class="status-message"></div>
+                        </div>
+                    </div>
 
-                     // --- Atualizar Toolbar Temps ---
-                    if (toolbarNozzleValue) {
-                        toolbarNozzleValue.textContent = `${printData.nozzle_temper?.toFixed(1) ?? '-'} / ${printData.nozzle_target_temper?.toFixed(0) ?? '-'}`;
-                    }
-                    if (toolbarBedValue) {
-                        toolbarBedValue.textContent = `${printData.bed_temper?.toFixed(1) ?? '-'} / ${printData.bed_target_temper?.toFixed(0) ?? '-'}`;
-                    }
-                    if (printData.chamber_temper !== undefined && printData.chamber_temper !== null) {
-                        if(toolbarChamberItem) toolbarChamberItem.style.display = 'inline'; // Mostra se houver dados
-                        if(toolbarChamberValue) toolbarChamberValue.textContent = `${printData.chamber_temper?.toFixed(1) ?? '-'}`;
-                    } else {
-                        if(toolbarChamberItem) toolbarChamberItem.style.display = 'none'; // Esconde se não houver dados
-                    }
+                     <!-- Histórico -->
+                    <div class="maintenance-group history-group wide">
+                         <h2>Histórico de Manutenção</h2>
+                         <div class="table-container">
+                             <table id="maintenance-history-table">
+                                 <thead>
+                                     <tr>
+                                         <th>Data/Hora</th>
+                                         <th>Tarefa</th>
+                                         <th>Horas Imp. (no log)</th>
+                                         <th>Nº Imp. (no log)</th>
+                                         <th>Observações</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     <!-- Linhas serão adicionadas pelo JS -->
+                                     <tr><td colspan="5" class="loading">Carregando histórico...</td></tr>
+                                 </tbody>
+                             </table>
+                         </div>
+                    </div>
+                </div> <!-- Fim maintenance-grid -->
 
-                    // --- Visão Geral ---
-                     if(overviewDiv) {
-                        overviewDiv.appendChild(createStatusItem('Estado', printData.gcode_state));
-                        overviewDiv.appendChild(createStatusItem('Sinal Wi-Fi', printData.wifi_signal));
-                    }
+            </div>
+        </section>
 
-                    // --- Progresso da Impressão ---
-                    const gcodeFile = printData.gcode_file || 'Nenhum';
-                    const percent = printData.mc_percent !== undefined ? printData.mc_percent : 0;
-                    const remainingMinutes = printData.mc_remaining_time;
-                    const layerNum = printData.layer_num || 0;
-                    const totalLayerNum = printData.total_layer_num || 0;
+    </main>
 
-                    if(progressDiv) {
-                        progressDiv.appendChild(createStatusItem('Arquivo G-code', gcodeFile));
-                        progressDiv.appendChild(createStatusItem('Camada', `${layerNum} / ${totalLayerNum}`));
-                        progressDiv.appendChild(createStatusItem('Tempo Restante', formatTime(remainingMinutes)));
-                    }
-                    if(progressBarSection) {
-                        const progressBarContainer = document.createElement('div');
-                        progressBarContainer.className = 'progress-bar-container';
-                        const progressBar = document.createElement('div');
-                        progressBar.className = 'progress-bar';
-                        progressBar.style.width = `${percent}%`;
-                        progressBar.textContent = `${percent}%`;
-                        progressBarContainer.appendChild(progressBar);
-                        progressBarSection.appendChild(progressBarContainer);
-                    }
-
-                    // --- Temperaturas & Ventoinhas (para exibição nos quadros) ---
-                    if(tempsFansDiv) {
-                        const tempsDiv = document.createElement('div');
-                        tempsDiv.className = 'status-item';
-                        let tempsHTML = '<strong>Temperaturas (°C)</strong>';
-                        tempsHTML += `<p><span class="label">Bico:</span> <span class="value">${printData.nozzle_temper?.toFixed(1) ?? 'N/A'} / ${printData.nozzle_target_temper?.toFixed(1) ?? 'N/A'}</span></p>`;
-                        tempsHTML += `<p><span class="label">Mesa:</span> <span class="value">${printData.bed_temper?.toFixed(1) ?? 'N/A'} / ${printData.bed_target_temper?.toFixed(1) ?? 'N/A'}</span></p>`;
-                        if (printData.chamber_temper !== undefined) {
-                            tempsHTML += `<p><span class="label">Câmara:</span> <span class="value">${printData.chamber_temper?.toFixed(1) ?? 'N/A'}</span></p>`;
-                        }
-                        tempsDiv.innerHTML = tempsHTML;
-                        tempsFansDiv.appendChild(tempsDiv);
-
-                        const fansDiv = document.createElement('div');
-                        fansDiv.className = 'status-item';
-                        let fansHTML = '<strong>Ventoinhas (%)</strong>';
-                        fansHTML += `<p><span class="label">Peça:</span> <span class="value">${printData.cooling_fan_speed ?? 'N/A'}%</span></p>`;
-                        fansHTML += `<p><span class="label">Auxiliar:</span> <span class="value">${printData.big_fan1_speed ?? 'N/A'}%</span></p>`;
-                        fansHTML += `<p><span class="label">Câmara:</span> <span class="value">${printData.big_fan2_speed ?? 'N/A'}%</span></p>`;
-                        fansDiv.innerHTML = fansHTML;
-                        tempsFansDiv.appendChild(fansDiv);
-                    }
-
-                    // --- Adicionar dados ao Gráfico ---
-                    addDataToChart(Date.now(), printData.nozzle_temper, printData.bed_temper, printData.chamber_temper);
-
-                    // --- Dados do AMS ---
-                     if(amsDiv) {
-                        if (printData.ams && printData.ams.ams && printData.ams.ams.length > 0) {
-                            printData.ams.ams.forEach((amsUnit, amsIndex) => {
-                                const unitDiv = document.createElement('div');
-                                unitDiv.className = 'ams-unit';
-                                unitDiv.innerHTML = `<h3>AMS ${amsIndex + 1} <span class="label">(Temp: ${amsUnit.temp || 'N/A'}°C, Umid: ${amsUnit.humidity || 'N/A'})</span></h3>`;
-
-                                if (amsUnit.tray && amsUnit.tray.length > 0) {
-                                    amsUnit.tray.forEach(tray => {
-                                        if (!tray.cols && !tray.tray_type) return;
-
-                                        const trayDiv = document.createElement('div');
-                                        trayDiv.className = 'ams-tray';
-                                        const trayId = tray.id !== undefined ? parseInt(tray.id) : -1;
-                                        trayDiv.innerHTML = `<h4>Bandeja ${trayId >= 0 ? trayId + 1 : '?'}</h4>`;
-
-                                        const colorHex = tray.tray_color || 'FFFFFF00';
-                                        const colorRgb = hexToRgb(colorHex);
-
-                                        const filamentInfo = document.createElement('p');
-                                        const colorSpan = document.createElement('span');
-                                        colorSpan.className = 'filament-color';
-                                        colorSpan.style.backgroundColor = colorRgb;
-                                        filamentInfo.appendChild(colorSpan);
-
-                                        const type = tray.tray_type || 'Desconhecido';
-                                        const profile = tray.tray_info_idx ? `(${tray.tray_info_idx})` : '';
-                                        const remaining = tray.remain !== undefined ? `${tray.remain}%` : 'N/A';
-
-                                        filamentInfo.appendChild(document.createTextNode(` ${type} ${profile}` ));
-                                        trayDiv.appendChild(filamentInfo);
-
-                                        const remainingInfo = document.createElement('p');
-                                        remainingInfo.innerHTML = `<span class="label">Restante:</span> <span class="value">${remaining}</span>`;
-                                        trayDiv.appendChild(remainingInfo);
-
-                                        unitDiv.appendChild(trayDiv);
-                                    });
-                                    if (unitDiv.querySelectorAll('.ams-tray').length === 0) {
-                                         unitDiv.innerHTML += '<p>Nenhuma bandeja com filamento detectada nesta unidade.</p>';
-                                    }
-                                } else {
-                                    unitDiv.innerHTML += '<p>Nenhuma bandeja detectada nesta unidade.</p>';
-                                }
-                                amsDiv.appendChild(unitDiv);
-                            });
-                        } else {
-                            amsDiv.innerHTML = '<div class="loading">Nenhuma unidade AMS detectada ou sem dados.</div>';
-                        }
-                    }
-
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar status:', error);
-                    if (errorDiv) {
-                        errorDiv.textContent = `Falha ao conectar ao backend (${error.message}). Verifique se o script app.py está rodando e configurado corretamente.`;
-                        errorDiv.style.display = 'block';
-                    }
-                     // Limpa áreas de dados em caso de erro?
-                    // if(overviewDiv) overviewDiv.innerHTML = '';
-                    // if(progressDiv) progressDiv.innerHTML = '';
-                    // ... etc ...
-                });
-        }
-
-        // --- Código que roda após o DOM carregar ---
-
-        document.addEventListener('DOMContentLoaded', (event) => {
-            console.log("DOM completamente carregado e processado.");
-
-            // Inicializa o feed da câmera AGORA
-            if (cameraFeed) {
-                cameraFeed.src = '/camera_proxy';
-                cameraFeed.onerror = () => {
-                    console.error('Erro ao carregar o stream da câmera em /camera_proxy');
-                    cameraFeed.alt = 'Erro ao carregar câmera. Verifique URL e se a câmera está ativa.';
-                };
-            } else {
-                console.error("Elemento da câmera #camera-feed não encontrado.");
-            }
-
-            // Inicializa o gráfico AGORA
-            initializeChart();
-
-            // Inicia a busca de status e o intervalo AGORA
-            updateStatus();
-            setInterval(updateStatus, 3000);
-        });
-
-        // --- Lógica do Tema Claro/Escuro ---
-        const themeToggleButton = document.getElementById('theme-toggle');
-
-        // Função para aplicar o tema (lido do localStorage ou padrão)
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                document.body.classList.add('dark-theme');
-                themeToggleButton.textContent = '☀️ Tema Claro';
-                // Atualizar opções do gráfico para o tema escuro
-                if (tempChart) {
-                    Chart.defaults.color = '#dee2e6'; // Cor padrão para textos no gráfico
-                    tempChart.options.scales.x.ticks.color = '#adb5bd';
-                    tempChart.options.scales.y.ticks.color = '#adb5bd';
-                    tempChart.options.scales.x.grid.color = 'rgba(255, 255, 255, 0.1)';
-                    tempChart.options.scales.y.grid.color = 'rgba(255, 255, 255, 0.1)';
-                     tempChart.options.scales.x.title.color = '#e9ecef';
-                    tempChart.options.scales.y.title.color = '#e9ecef';
-                    tempChart.options.plugins.legend.labels.color = '#e9ecef';
-                    tempChart.update();
-                }
-            } else {
-                document.body.classList.remove('dark-theme');
-                themeToggleButton.textContent = '🌙 Tema Escuro';
-                // Atualizar opções do gráfico para o tema claro
-                 if (tempChart) {
-                    Chart.defaults.color = '#666'; // Cor padrão para textos no gráfico
-                    tempChart.options.scales.x.ticks.color = '#666';
-                    tempChart.options.scales.y.ticks.color = '#666';
-                    tempChart.options.scales.x.grid.color = 'rgba(0, 0, 0, 0.1)';
-                    tempChart.options.scales.y.grid.color = 'rgba(0, 0, 0, 0.1)';
-                    tempChart.options.scales.x.title.color = '#333';
-                    tempChart.options.scales.y.title.color = '#333';
-                    tempChart.options.plugins.legend.labels.color = '#333';
-                    tempChart.update();
-                }
-            }
-        }
-
-        // Função para alternar o tema
-        function toggleTheme() {
-            let currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-            let newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            localStorage.setItem('theme', newTheme); // Salva a preferência
-            applyTheme(newTheme);
-        }
-
-        // Event listener para o botão
-        themeToggleButton.addEventListener('click', toggleTheme);
-
-        // Aplicar o tema salvo ao carregar a página
-        const savedTheme = localStorage.getItem('theme') || 'light'; // Padrão é 'light'
-        applyTheme(savedTheme);
-
-    </script>
+    <!-- Link para o JS externo -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html> 

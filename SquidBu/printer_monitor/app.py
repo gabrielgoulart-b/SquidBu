@@ -123,6 +123,58 @@ def get_status():
         current_status = printer_status.copy()
     return jsonify(current_status)
 
+@app.route('/command', methods=['POST'])
+def handle_command():
+    """Recebe um comando para ser enviado à impressora."""
+    data = request.get_json()
+    command = data.get('command')
+    sequence_id = str(int(time.time()))
+
+    if command == 'gcode':
+        gcode_line = data.get('line')
+        if not gcode_line:
+            return jsonify({"success": False, "error": "Linha G-code ausente."}), 400
+        payload_to_send = {
+            "print": {
+                "sequence_id": sequence_id,
+                "command": "gcode_line",
+                "param": gcode_line
+            }
+        }
+    elif command == 'set_nozzle_temp':
+        value = data.get('value')
+        if value is None or not isinstance(value, (int, float)) or value < 0 or value > 300:
+            return jsonify({"success": False, "error": "Temperatura do bico inválida (0-300°C)."}), 400
+        payload_to_send = {
+            "print": {
+                "sequence_id": sequence_id,
+                "command": "gcode_line",
+                "param": f"M104 S{value}"
+            }
+        }
+    elif command == 'set_bed_temp':
+        value = data.get('value')
+        if value is None or not isinstance(value, (int, float)) or value < 0 or value > 120:
+            return jsonify({"success": False, "error": "Temperatura da mesa inválida (0-120°C)."}), 400
+        payload_to_send = {
+            "print": {
+                "sequence_id": sequence_id,
+                "command": "gcode_line",
+                "param": f"M140 S{value}"
+            }
+        }
+    else:
+        return jsonify({"success": False, "error": f"Comando desconhecido: {command}"}), 400
+
+    payload_json = json.dumps(payload_to_send)
+    print(f"Enviando comando '{command}' para {TOPIC_REQUEST}")
+    client = mqtt.Client()
+    client.connect(PRINTER_IP, MQTT_PORT, 60)
+    client.publish(TOPIC_REQUEST, payload_json)
+    client.disconnect()
+
+    return jsonify({"success": True})
+
 # --- Inicialização ---
 
 if __name__ == '__main__':

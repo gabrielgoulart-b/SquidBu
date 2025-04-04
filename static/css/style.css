@@ -1,0 +1,511 @@
+/* Conteúdo da tag <style> do index.html será colado aqui */
+:root {
+    /* Tema Claro (Padrão) */
+    --bg-color: #f4f4f4;
+    --text-color: #333;
+    --container-bg: #fff;
+    --item-bg: #f9f9f9;
+    --item-alt-bg: #f0f0f0;
+    --border-color: #ddd;
+    --border-light-color: #eee;
+    --link-color: #007bff;
+    --header-color: #333;
+    --label-color: #666;
+    --value-color: #000;
+    --success-color: #4CAF50;
+    --error-bg: #fdd;
+    --error-border: #e74c3c;
+    --error-text: #e74c3c;
+    --button-bg: #e0e0e0;
+    --button-text: #333;
+    --shadow-color: rgba(0,0,0,0.1);
+    --sidebar-bg: #e9ecef;
+    --sidebar-link-color: #495057;
+    --sidebar-link-hover-bg: #ced4da;
+    --sidebar-link-active-bg: #007bff;
+    --sidebar-link-active-color: #fff;
+}
+
+body.dark-theme {
+    /* Tema Escuro */
+    --bg-color: #000000;
+    --text-color: #dee2e6;
+    --container-bg: #181818;
+    --item-bg: #282828;
+    --item-alt-bg: #383838;
+    --border-color: #444;
+    --border-light-color: #333;
+    --link-color: #77b3ff;
+    --header-color: #e9ecef;
+    --label-color: #adb5bd;
+    --value-color: #f8f9fa;
+    --success-color: #28a745;
+    --error-bg: #402024;
+    --error-border: #a02c38;
+    --error-text: #f8d7da;
+    --button-bg: #444;
+    --button-text: #f8f9fa;
+    --shadow-color: rgba(255,255,255,0.05);
+    --sidebar-bg: #212529;
+    --sidebar-link-color: #adb5bd;
+    --sidebar-link-hover-bg: #343a40;
+    --sidebar-link-active-bg: #007bff;
+    --sidebar-link-active-color: #fff;
+}
+
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+    display: flex; /* Para layout com sidebar */
+    min-height: 100vh; /* Garante que o body ocupe a altura toda */
+}
+
+#sidebar {
+    width: 200px;
+    background-color: var(--sidebar-bg);
+    padding: 15px;
+    height: 100vh; /* Ocupa toda a altura */
+    position: fixed; /* Fica fixa */
+    left: 0;
+    top: 0;
+    overflow-y: auto; /* Adiciona scroll se necessário */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 1000;
+    transition: background-color 0.3s;
+}
+
+#sidebar h2 {
+    color: var(--header-color);
+    font-size: 1.3em;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#sidebar ul li a {
+    display: block;
+    color: var(--sidebar-link-color);
+    text-decoration: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+#sidebar ul li a:hover {
+    background-color: var(--sidebar-link-hover-bg);
+}
+
+#sidebar ul li a.active {
+    background-color: var(--sidebar-link-active-bg);
+    color: var(--sidebar-link-active-color);
+    font-weight: bold;
+}
+
+
+#main-content {
+    margin-left: 200px; /* Espaço para a sidebar */
+    flex-grow: 1; /* Ocupa o resto do espaço */
+    padding: 0; /* Remover padding do main, colocar nos containers internos se necessário */
+    position: relative; /* Para posicionar a toolbar */
+}
+
+#toolbar {
+    background-color: var(--item-bg);
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1010;
+    font-size: 0.9em;
+    width: 100%; /* Garante que ocupe a largura da área de conteúdo */
+    box-sizing: border-box; /* Inclui padding na largura */
+}
+
+#toolbar-temps span {
+    margin-right: 15px;
+    white-space: nowrap;
+}
+
+#toolbar button {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#toolbar button:hover {
+    opacity: 0.9;
+}
+
+/* Ajuste para o container dentro do main-content */
+.content-section .container {
+    background-color: var(--container-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    max-width: 1200px;
+    margin: 20px auto; /* Centraliza e adiciona margem */
+}
+
+/* Estilos gerais (mantidos do original) */
+h1, h2 {
+    color: var(--header-color);
+    border-bottom: 2px solid var(--border-light-color);
+    padding-bottom: 10px;
+}
+
+/* Ajuste: H1 só deve aparecer uma vez no topo talvez, ou por seção */
+/* H2 dentro das seções */
+.content-section h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: var(--header-color); /* Garante a cor do tema */
+    border-bottom: 1px solid var(--border-light-color); /* Linha mais sutil */
+    padding-bottom: 8px;
+}
+
+
+.status-grid, .ams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+.status-item, .ams-unit, .ams-tray {
+    background-color: var(--item-bg);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+    border-radius: 5px;
+ }
+.status-item strong { display: block; margin-bottom: 5px; color: var(--label-color); font-size: 0.9em; }
+.status-item p { margin: 8px 0; }
+.status-value { font-size: 1.1em; font-weight: bold; color: var(--value-color); }
+#error-message {
+    color: var(--error-text);
+    background-color: var(--error-bg);
+    border: 1px solid var(--error-border);
+    padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 15px; text-align: center; }
+.progress-bar-container { width: 100%; background-color: #e0e0e0; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+.progress-bar { height: 24px; background-color: var(--success-color); width: 0%; border-radius: 4px; text-align: center; line-height: 24px; color: white; font-weight: bold; transition: width 0.5s ease-in-out; white-space: nowrap; }
+.ams-unit h3, .ams-tray h4 { margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid var(--border-light-color); padding-bottom: 5px; }
+.filament-color { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px; vertical-align: middle; border: 1px solid #555; }
+.ams-tray p { margin: 5px 0; }
+.loading { text-align: center; padding: 20px; color: var(--label-color); }
+.label { font-weight: normal; color: var(--label-color); }
+.value { font-weight: bold; color: var(--value-color); }
+
+/* Layout de Colunas (Dentro do #dashboard-content) */
+#dashboard-content #layout-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+#dashboard-content #left-column {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+#dashboard-content #center-column {
+    flex: 3;
+    min-width: 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+#dashboard-content #right-column {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+#dashboard-content #left-column .status-grid,
+#dashboard-content #right-column .status-grid,
+#dashboard-content #right-column #ams-data {
+     grid-template-columns: 1fr;
+}
+#dashboard-content #camera-feed {
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    border: 1px solid var(--border-color);
+    background-color: var(--item-alt-bg);
+    transform: rotate(180deg);
+}
+#dashboard-content #temp-chart-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    margin-top: 20px;
+}
+
+canvas#temperatureChart {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Estilos para mostrar/ocultar seções */
+.content-section {
+    display: none; /* Oculto por padrão */
+    padding-top: 60px; /* Espaço para a toolbar fixa */
+}
+
+.content-section.active {
+    display: block; /* Mostra a seção ativa */
+}
+
+
+/* Ajustes Chart.js para tema escuro */
+body.dark-theme .chartjs-legend ul li span {
+    color: var(--text-color);
+}
+body.dark-theme .chartjs-tooltip-body span {
+    color: var(--text-color);
+}
+body.dark-theme .chartjs-render-monitor {
+    background-color: var(--item-bg);
+}
+
+
+/* Media Query para Telas Menores (Responsividade) */
+@media (max-width: 992px) { /* Ajuste ponto de quebra se necessário */
+     #dashboard-content #layout-container {
+        flex-direction: column;
+    }
+    #dashboard-content #left-column,
+    #dashboard-content #center-column,
+    #dashboard-content #right-column {
+         min-width: unset;
+         width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    #sidebar {
+        width: 60px; /* Reduz a largura da sidebar */
+        padding: 10px 5px;
+    }
+    #sidebar h2 {
+        display: none; /* Esconde o título */
+    }
+     #sidebar ul li a {
+        padding: 10px;
+        text-align: center;
+    }
+    #sidebar ul li a .link-text {
+        display: none; /* Esconde o texto dos links */
+    }
+     /* Adicionar ícones aqui seria ideal */
+
+    #main-content {
+        margin-left: 60px; /* Ajusta a margem para a sidebar reduzida */
+    }
+
+    #toolbar {
+        padding: 5px 10px;
+        font-size: 0.8em;
+    }
+    #toolbar-temps span {
+        margin-right: 8px;
+    }
+
+    .content-section .container {
+        margin: 10px;
+        padding: 15px;
+    }
+     h1 {
+        font-size: 1.3em;
+    }
+    .content-section h2 {
+        font-size: 1.1em;
+    }
+    /* Ajustes específicos do dashboard em telas pequenas */
+     #dashboard-content #layout-container {
+        gap: 10px; /* Reduz espaço */
+    }
+
+    /* Força grids para uma coluna mais cedo se necessário */
+    .status-grid, .ams-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+     /* Ajustes ainda menores se necessário */
+     #sidebar {
+        width: 50px;
+     }
+     #main-content {
+        margin-left: 50px;
+     }
+     #toolbar-temps span { /* Esconde alguns itens da toolbar se ficar muito cheio */
+        /* display: none; */ /* Exemplo */
+     }
+}
+
+/* --- Estilos da Seção de Controle --- */
+#control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Layout responsivo */
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.control-group {
+    background-color: var(--item-bg);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+    border-radius: 5px;
+}
+
+/* Grupo de G-code pode ocupar mais espaço */
+.control-group.wide {
+    grid-column: span 2; /* Ocupa 2 colunas se houver espaço */
+}
+
+.control-group h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+    border-bottom: 1px solid var(--border-light-color);
+    padding-bottom: 8px;
+}
+
+.control-button,
+.control-select,
+.control-input {
+    padding: 8px 12px;
+    margin: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.control-button:hover {
+    opacity: 0.85;
+}
+
+.control-button.danger {
+    background-color: #e74c3c; /* Vermelho para perigo */
+    color: white;
+    border-color: #c0392b;
+}
+
+.control-button.danger:hover {
+    background-color: #c0392b;
+}
+
+.control-select {
+    min-width: 150px;
+}
+
+.control-input {
+    width: auto; /* Ou remover a regra */
+}
+
+.control-group div {
+    margin-bottom: 10px; /* Espaço entre linhas de controle (ex: LEDs) */
+}
+
+.control-group label {
+    margin-right: 10px;
+    color: var(--label-color);
+}
+
+#command-status {
+    min-height: 20px;
+    color: var(--label-color);
+    font-style: italic;
+}
+
+.gcode-examples {
+    display: none; /* Esconder elementos de gcode antigo */
+}
+
+.gcode-example-button {
+    display: none; /* Esconder elementos de gcode antigo */
+}
+
+/* Responsividade para a grade de controle */
+@media (max-width: 600px) {
+    #control-grid {
+        grid-template-columns: 1fr; /* Uma coluna em telas pequenas */
+    }
+    .control-group.wide {
+        grid-column: span 1; /* Ocupa 1 coluna */
+    }
+    .control-input {
+        width: calc(100% - 110px);
+    }
+}
+
+/* Ajustes para Controle de Temperatura */
+.temperature-control .temp-fan-control {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Permite quebra em telas menores */
+    gap: 10px; /* Espaço entre os elementos */
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border-light-color);
+}
+.temperature-control .temp-fan-control:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.temperature-control label {
+    flex-basis: 100px; /* Largura fixa para o label */
+    text-align: right;
+    margin-right: 5px; /* Menor margem */
+}
+
+.temperature-control .current-value {
+    font-size: 0.9em;
+    color: var(--label-color);
+    min-width: 110px; /* Espaço para 'Atual: XXX.X°C' */
+    text-align: right;
+}
+
+.temperature-control .temp-fan-input {
+    width: 80px; /* Largura fixa para input numérico */
+    padding: 6px 8px;
+    text-align: center;
+}
+
+/* Remove as setas do input number (opcional) */
+.temperature-control input[type=number]::-webkit-outer-spin-button,
+.temperature-control input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.temperature-control input[type=number] {
+    -moz-appearance: textfield; /* Firefox */
+}
+
+.temperature-control .apply-button {
+    padding: 6px 10px;
+    font-size: 0.85em;
+    margin-left: auto; /* Empurra para a direita se houver espaço */
+} 
