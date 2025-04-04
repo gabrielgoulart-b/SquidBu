@@ -10,7 +10,7 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
     *   **Progress:** G-code file, current/total layer, remaining time, progress bar.
     *   **Temperatures & Fans:** Current and target nozzle/bed temperature, chamber temperature (if available), fan speeds.
     *   **AMS:** Details of each AMS unit and tray (filament type, color, estimated remaining percentage). *(Note: Interface now attempts to read `stg` array data for better AMS Lite compatibility).*
-    *   **Camera:** Displays the video stream from the printer's camera (requires correct URL configuration in `config.json` and camera accessibility).
+    *   **Camera:** Displays the video stream. Requires a USB camera connected to the device running the app and MJPG-Streamer configuration (see below) or another MJPEG source accessible via URL.
     *   **Temperature Chart:** History of nozzle, bed, and chamber temperatures.
 *   **User Authentication:** Login system with username and password to protect access to the main interface. Includes a "Remember Me" option.
 *   **Shareable Live View:** A special URL (`/live/<token>`) allows sharing a simplified view (progress and camera) without login, protected by a secret token. Now includes a "🔗 Share" button in the top bar for easier link copying/sending.
@@ -59,7 +59,10 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
         *   `PRINTER_IP`: The IP address of your Bambu Lab printer on the local network.
         *   `ACCESS_CODE`: The LAN Access Code for your printer (found in its network settings or the Bambu Handy app).
         *   `DEVICE_ID`: The Serial Number of your printer.
-        *   `CAMERA_URL`: The full URL for your camera's MJPEG stream (e.g., `http://192.168.X.Y:ZZZZ/?action=stream`). If not using, you can leave the example value.
+        *   `CAMERA_URL`: The URL for the MJPEG stream.
+            *   If using MJPG-Streamer running locally (see step 5), use something like `http://127.0.0.1:8080/?action=stream` (adjust the port if needed).
+            *   If using another source (IP camera, printer's own stream if accessible), put the direct URL.
+            *   If not using, you can leave the example value.
         *   `SECRET_KEY`: A long, random secret key for Flask session security. **Important:** Generate a secure key! You can use Python:
             ```bash
             # In the terminal, run:
@@ -114,6 +117,88 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
         pip install -r requirements.txt
         ```
 
+5.  **Configure Camera (Optional - via MJPG-Streamer for USB Webcam):**
+    *   This step is only necessary if you want to use a USB webcam connected to the device running SquidBu (Raspberry Pi or Linux PC) as the video source.
+    *   **a) Install MJPG-Streamer:**
+        *   Try installing via package manager (may not be available in all distributions):
+            ```bash
+            sudo apt update && sudo apt install mjpg-streamer -y
+            ```
+        *   If the command above fails (package not found), compile from source:
+            1.  Install build dependencies:
+                ```bash
+                sudo apt update && sudo apt install cmake libjpeg-dev build-essential git -y
+                ```
+            2.  Clone the repository (a common fork):
+                ```bash
+                cd ~ # Or another suitable directory outside the SquidBu project
+                git clone https://github.com/jacksonliam/mjpg-streamer.git
+                ```
+            3.  Compile:
+                ```bash
+                cd mjpg-streamer/mjpg-streamer-experimental
+                make
+                ```
+                *(Optional: `sudo make install` can copy files to system locations, but we'll run from the build directory for now)*
+    *   **b) Identify your Webcam:**
+        *   Connect the USB webcam.
+        *   List video devices:
+            ```bash
+            ls /dev/video*
+            ```
+        *   Note the correct device (usually `/dev/video0`, but could be `/dev/video1`, etc.).
+    *   **c) Test MJPG-Streamer:**
+        *   Navigate to the directory where `mjpg_streamer` was compiled or installed. Example if compiled manually:
+            ```bash
+            cd ~/mjpg-streamer/mjpg-streamer-experimental
+            ```
+        *   Run the command, adjusting the device (`-d`), resolution (`-r`), FPS (`-f`), and port (`-p`) as needed:
+            ```bash
+            ./mjpg_streamer -i './input_uvc.so -d /dev/video0 -r 1280x720 -f 15' -o './output_http.so -w ./www -p 8080'
+            ```
+        *   Access `http://<IP_OF_YOUR_DEVICE>:8080` in a browser to check if the stream is working. Stop the command with `Ctrl+C` after testing.
+    *   **d) Update `config.json`:**
+        *   Ensure the `CAMERA_URL` key in your main `config.json` (for SquidBu) is set to access MJPG-Streamer locally. Use the port defined in the previous step (e.g., 8080):
+            ```json
+            "CAMERA_URL": "http://127.0.0.1:8080/?action=stream"
+            ```
+    *   **e) (Recommended) Create Systemd Service for MJPG-Streamer:**
+        *   To have MJPG-Streamer start automatically with the system:
+            1.  Create the service file:
+                ```bash
+                sudo nano /etc/systemd/system/mjpg-streamer.service
+                ```
+            2.  Paste the following content, **adjusting `User`, `Group`, `WorkingDirectory`, and the command in `ExecStart`** to match your setup (user, compilation path, video device, resolution, port):
+                ```ini
+                [Unit]
+                Description=MJPG-Streamer - Webcam Streamer
+                After=network-online.target
+                Wants=network-online.target
+
+                [Service]
+                Type=simple
+                User=<YOUR_USERNAME>
+                Group=video
+                WorkingDirectory=<PATH_TO_mjpg-streamer-experimental>
+                ExecStart=<PATH_TO_mjpg-streamer-experimental>/mjpg_streamer -i './input_uvc.so -d /dev/videoX -r <RESOLUTION> -f <FPS>' -o './output_http.so -w ./www -p <PORT>'
+                Restart=on-failure
+                RestartSec=5
+
+                [Install]
+                WantedBy=multi-user.target
+                ```
+            3.  Save and close (`Ctrl+X`, `Y`, `Enter`).
+            4.  Reload, enable, and start the service:
+                ```bash
+                sudo systemctl daemon-reload
+                sudo systemctl enable mjpg-streamer.service
+                sudo systemctl start mjpg-streamer.service
+                ```
+            5.  Check the status:
+                ```bash
+                sudo systemctl status mjpg-streamer.service
+                ```
+
 ## Local Execution
 
 1.  **Ensure `config.json` exists and is correctly filled (including login keys).**
@@ -125,12 +210,15 @@ This project implements a web page to monitor the status of a Bambu Lab 3D print
         ```
     *   If there are errors loading `config.json` or missing dependencies, messages will appear in the terminal.
 
-3.  **Access the web page:**
+3.  **Start the `mjpg-streamer.service` (if configured):**
+    *   If using MJPG-Streamer, ensure it's running.
+
+4.  **Access the web page:**
     *   Open a browser on the **same local network**.
     *   Go to: `http://<IP_OF_DEVICE_RUNNING_APP>:5000` (replace with the IP of the device running the app).
     *   You will be redirected to the login page. Use the `LOGIN_USERNAME` and the password corresponding to the `LOGIN_PASSWORD_HASH` configured.
 
-4.  **Enable Notifications (Optional):** If configured in `config.json`, click the 🔔 button in the top bar and allow notifications in your browser.
+5.  **Enable Notifications (Optional):** If configured in `config.json`, click the 🔔 button in the top bar and allow notifications in your browser.
 
 ## Shareable Live View (Optional)
 

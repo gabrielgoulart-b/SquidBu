@@ -10,7 +10,7 @@ Este projeto implementa uma página web para monitorar o status de uma impressor
     *   **Progresso:** Arquivo G-code, camada atual/total, tempo restante, barra de progresso.
     *   **Temperaturas & Ventoinhas:** Temperatura atual e alvo do bico e mesa, temperatura da câmara (se disponível), velocidade das ventoinhas.
     *   **AMS:** Detalhes de cada unidade AMS e bandeja (tipo de filamento, cor, porcentagem restante estimada). *(Nota: A interface agora tenta ler dados do array `stg` para melhor compatibilidade com AMS Lite).*
-    *   **Câmera:** Exibe o stream de vídeo da câmera da impressora (requer configuração correta do URL em `config.json` e acessibilidade da câmera).
+    *   **Câmera:** Exibe o stream de vídeo da câmera. Requer uma câmera USB conectada ao dispositivo que roda o app e a configuração do MJPG-Streamer (veja abaixo) ou outra fonte MJPEG acessível via URL.
     *   **Gráfico de Temperaturas:** Histórico das temperaturas do bico, mesa e câmara.
 *   **Autenticação de Usuário:** Sistema de login com nome de usuário e senha para proteger o acesso à interface principal. Inclui opção "Lembrar-me".
 *   **Visualização Ao Vivo Compartilhável:** Uma URL especial (`/live/<token>`) permite compartilhar uma visualização simplificada (progresso e câmera) sem login, protegida por um token secreto. Agora inclui um botão "🔗 Compartilhar" na barra superior para facilitar a cópia/envio do link.
@@ -58,7 +58,10 @@ Este projeto implementa uma página web para monitorar o status de uma impressor
         *   `PRINTER_IP`: O endereço IP da sua impressora Bambu Lab na rede local.
         *   `ACCESS_CODE`: O Código de Acesso LAN da sua impressora (encontrado nas configurações de rede dela ou no app Bambu Handy).
         *   `DEVICE_ID`: O Número de Série da sua impressora.
-        *   `CAMERA_URL`: O URL completo para o stream MJPEG da sua câmera (ex: `http://192.168.X.Y:ZZZZ/?action=stream`). Se não for usar, pode deixar o valor de exemplo.
+        *   `CAMERA_URL`: A URL para o stream MJPEG. 
+            *   Se usar MJPG-Streamer rodando localmente (veja passo 5), use algo como `http://127.0.0.1:8080/?action=stream` (ajuste a porta se necessário).
+            *   Se usar outra fonte (câmera IP, stream da própria Bambu se acessível), coloque a URL direta.
+            *   Se não for usar, pode deixar o valor de exemplo.
         *   `SECRET_KEY`: Uma chave secreta longa e aleatória para segurança da sessão Flask. **Importante:** Gere uma chave segura! Você pode usar Python:
             ```bash
             # No terminal, execute:
@@ -113,6 +116,88 @@ Este projeto implementa uma página web para monitorar o status de uma impressor
         pip install -r requirements.txt
         ```
 
+5.  **Configure a Câmera (Opcional - via MJPG-Streamer para Webcam USB):**
+    *   Esta etapa é necessária apenas se você quiser usar uma webcam USB conectada ao dispositivo que roda o SquidBu (Raspberry Pi ou PC Linux) como fonte de vídeo.
+    *   **a) Instale o MJPG-Streamer:**
+        *   Tente instalar via gerenciador de pacotes (pode não estar disponível em todas as distribuições):
+            ```bash
+            sudo apt update && sudo apt install mjpg-streamer -y
+            ```
+        *   Se o comando acima falhar (pacote não encontrado), compile a partir do código-fonte:
+            1.  Instale as dependências de compilação:
+                ```bash
+                sudo apt update && sudo apt install cmake libjpeg-dev build-essential git -y
+                ```
+            2.  Clone o repositório (um fork comum):
+                ```bash
+                cd ~ # Ou outro diretório adequado fora do projeto SquidBu
+                git clone https://github.com/jacksonliam/mjpg-streamer.git
+                ```
+            3.  Compile:
+                ```bash
+                cd mjpg-streamer/mjpg-streamer-experimental
+                make
+                ```
+                *(Opcional: `sudo make install` pode copiar os arquivos para locais do sistema, mas rodaremos do diretório de compilação por enquanto)*
+    *   **b) Identifique sua Webcam:**
+        *   Conecte a webcam USB.
+        *   Liste os dispositivos de vídeo:
+            ```bash
+            ls /dev/video*
+            ```
+        *   Anote o dispositivo correto (geralmente `/dev/video0`, mas pode ser `/dev/video1`, etc.).
+    *   **c) Teste o MJPG-Streamer:**
+        *   Navegue até o diretório onde o `mjpg_streamer` foi compilado ou instalado. Exemplo se compilado manualmente:
+            ```bash
+            cd ~/mjpg-streamer/mjpg-streamer-experimental
+            ```
+        *   Execute o comando, ajustando o dispositivo (`-d`), resolução (`-r`), FPS (`-f`) e porta (`-p`) conforme necessário:
+            ```bash
+            ./mjpg_streamer -i './input_uvc.so -d /dev/video0 -r 1280x720 -f 15' -o './output_http.so -w ./www -p 8080'
+            ```
+        *   Acesse `http://<IP_DO_SEU_DISPOSITIVO>:8080` no navegador para verificar se o stream está funcionando. Pare o comando com `Ctrl+C` após o teste.
+    *   **d) Atualize `config.json`:**
+        *   Certifique-se de que a chave `CAMERA_URL` no seu `config.json` principal (do SquidBu) esteja definida para acessar o MJPG-Streamer localmente. Use a porta definida no passo anterior (ex: 8080):
+            ```json
+            "CAMERA_URL": "http://127.0.0.1:8080/?action=stream"
+            ```
+    *   **e) (Recomendado) Crie um Serviço Systemd para MJPG-Streamer:**
+        *   Para que o MJPG-Streamer inicie automaticamente com o sistema:
+            1.  Crie o arquivo de serviço:
+                ```bash
+                sudo nano /etc/systemd/system/mjpg-streamer.service
+                ```
+            2.  Cole o seguinte conteúdo, **ajustando `User`, `Group`, `WorkingDirectory` e o comando em `ExecStart`** para corresponder à sua configuração (usuário, caminho da compilação, dispositivo de vídeo, resolução, porta):
+                ```ini
+                [Unit]
+                Description=MJPG-Streamer - Webcam Streamer
+                After=network-online.target
+                Wants=network-online.target
+
+                [Service]
+                Type=simple
+                User=<SEU_USUARIO>
+                Group=video
+                WorkingDirectory=<CAMINHO_PARA_mjpg-streamer-experimental>
+                ExecStart=<CAMINHO_PARA_mjpg-streamer-experimental>/mjpg_streamer -i './input_uvc.so -d /dev/videoX -r <RESOLUCAO> -f <FPS>' -o './output_http.so -w ./www -p <PORTA>'
+                Restart=on-failure
+                RestartSec=5
+
+                [Install]
+                WantedBy=multi-user.target
+                ```
+            3.  Salve e feche (`Ctrl+X`, `Y`, `Enter`).
+            4.  Recarregue, habilite e inicie o serviço:
+                ```bash
+                sudo systemctl daemon-reload
+                sudo systemctl enable mjpg-streamer.service
+                sudo systemctl start mjpg-streamer.service
+                ```
+            5.  Verifique o status:
+                ```bash
+                sudo systemctl status mjpg-streamer.service
+                ```
+
 ## Execução Local
 
 1.  **Certifique-se de que `config.json` existe e está preenchido corretamente (incluindo as chaves de login).**
@@ -124,12 +209,18 @@ Este projeto implementa uma página web para monitorar o status de uma impressor
         ```
     *   Se houver erros ao carregar `config.json` ou dependências faltando, mensagens aparecerão no terminal.
 
-3.  **Acesse a página web:**
+3.  **Inicie o serviço `mjpg-streamer.service` (se configurado):**
+    *   Se você configurou o MJPG-Streamer, inicie o serviço:
+        ```bash
+        sudo systemctl start mjpg-streamer.service
+        ```
+
+4.  **Acesse a página web:**
     *   Abra um navegador na **mesma rede local**.
     *   Acesse: `http://<IP_DO_DISPOSITIVO_RODANDO_APP>:5000` (substitua pelo IP do dispositivo que roda o app).
     *   Você será redirecionado para a página de login. Use o `LOGIN_USERNAME` e a senha correspondente ao `LOGIN_PASSWORD_HASH` configurados.
 
-4.  **Ative as Notificações (Opcional):** Se configurado no `config.json`, clique no botão 🔔 na barra superior e permita as notificações no seu navegador.
+5.  **Ative as Notificações (Opcional):** Se configurado no `config.json`, clique no botão 🔔 na barra superior e permita as notificações no seu navegador.
 
 ## Visualização Ao Vivo Compartilhável (Opcional)
 
