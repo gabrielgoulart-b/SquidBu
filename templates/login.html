@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - SquidBu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Estilos específicos para a página de login */
+        body.login-page {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+        }
+        .login-container {
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-container h1 {
+            color: var(--header-color);
+            margin-bottom: 20px;
+            border-bottom: none;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--label-color);
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: var(--item-bg);
+            color: var(--text-color);
+        }
+        .form-check {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+         .form-check label {
+             margin-left: 5px;
+             font-weight: normal;
+             color: var(--label-color);
+         }
+        .btn-submit {
+            background-color: var(--sidebar-link-active-bg); /* Usar a cor de destaque (verde) */
+            color: var(--sidebar-link-active-color);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        .alert-danger {
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--error-border);
+        }
+        .alert-info {
+             background-color: #e7f3fe; /* Azul claro */
+             color: #31708f;
+             border: 1px solid #bce8f1;
+        }
+        body.dark-theme .alert-info {
+            background-color: #2a3f50;
+             color: #a6d8f0;
+             border: 1px solid #4a6b7d;
+        }
+         .alert-success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+         body.dark-theme .alert-success {
+            background-color: #1a3d1b;
+            color: #b8e9bb;
+            border: 1px solid #2f6f31;
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <h1>SquidBu Login</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="">
+            {{ form.hidden_tag() }} <!-- Necessário para proteção CSRF -->
+            <div class="form-group">
+                {{ form.username.label }}<br>
+                {{ form.username(class="form-control") }}
+                {% for error in form.username.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
+            </div>
+            <div class="form-group">
+                {{ form.password.label }}<br>
+                {{ form.password(class="form-control") }}
+                {% for error in form.password.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
+            </div>
+            <div class="form-check">
+                {{ form.remember_me() }}
+                {{ form.remember_me.label }}
+            </div>
+            <div class="form-group">
+                {{ form.submit(class="btn btn-submit") }}
+            </div>
+        </form>
+    </div>
+     <script>
+        // Aplica tema escuro se necessário (baseado no localStorage)
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-theme');
+        }
+    </script>
+</body>
+</html> 

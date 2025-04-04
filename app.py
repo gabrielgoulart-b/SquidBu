@@ -5,8 +5,13 @@ import time
 import ssl
 import requests
 import os
-from flask import Flask, render_template, jsonify, Response, stream_with_context, request
-import datetime # Necessário para timestamp
+import datetime
+from flask import Flask, render_template, jsonify, Response, stream_with_context, request, redirect, url_for, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms.validators import DataRequired
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # --- Carregar Configuração ---
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
@@ -25,18 +30,30 @@ except Exception as e:
     print(f"ERRO CRÍTICO: Falha ao carregar '{CONFIG_FILE}': {e}")
     exit(1)
 
-# Validações básicas de configuração
-required_keys = ["PRINTER_IP", "ACCESS_CODE", "DEVICE_ID", "CAMERA_URL"]
-missing_keys = [key for key in required_keys if key not in config or not config[key]]
-if missing_keys:
-    print(f"ERRO CRÍTICO: Chaves obrigatórias ausentes ou vazias em '{CONFIG_FILE}': {missing_keys}")
+# Validações básicas de configuração (MQTT e Câmera)
+required_keys_infra = ["PRINTER_IP", "ACCESS_CODE", "DEVICE_ID", "CAMERA_URL"]
+missing_keys_infra = [key for key in required_keys_infra if key not in config or not config[key]]
+if missing_keys_infra:
+    print(f"ERRO CRÍTICO: Chaves de infraestrutura ausentes ou vazias em '{CONFIG_FILE}': {missing_keys_infra}")
     exit(1)
+
+# Validações básicas de configuração (Login)
+required_keys_login = ["SECRET_KEY", "LOGIN_USERNAME", "LOGIN_PASSWORD_HASH"]
+missing_keys_login = [key for key in required_keys_login if key not in config or not config[key]]
+if missing_keys_login:
+     print(f"ERRO CRÍTICO: Chaves de login ausentes ou vazias em '{CONFIG_FILE}': {missing_keys_login}")
+     print("Execute o passo de configuração para gerar a SECRET_KEY e o hash da senha.")
+     exit(1)
 
 # --- Usar Valores da Configuração ---
 PRINTER_IP = config["PRINTER_IP"]
 ACCESS_CODE = config["ACCESS_CODE"]
 DEVICE_ID = config["DEVICE_ID"]
 CAMERA_URL = config["CAMERA_URL"]
+SECRET_KEY = config["SECRET_KEY"]
+LOGIN_USERNAME = config["LOGIN_USERNAME"]
+LOGIN_PASSWORD_HASH = config["LOGIN_PASSWORD_HASH"]
+LIVE_SHARE_TOKEN = config.get("LIVE_SHARE_TOKEN") # Usar .get() para não quebrar se a chave não existir
 # -----------------------------------
 
 MQTT_PORT = 8883
@@ -57,133 +74,84 @@ command_sequence_id = int(time.time()) # Inicializa com timestamp
 sequence_lock = threading.Lock()
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = SECRET_KEY
 app.mqtt_client = None # Atributo para armazenar o cliente MQTT
 
-# --- Constantes ---
-MAINTENANCE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'maintenance_data.json')
-maintenance_lock = threading.Lock() # Para acesso seguro ao arquivo de manutenção
+# --- Configuração Flask-Login ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' # Rota para redirecionar se o usuário não estiver logado
+login_manager.login_message = "Por favor, faça login para acessar esta página."
+login_manager.login_message_category = "info" # Categoria para mensagens flash
 
-# --- Funções MQTT ---
+# --- Modelo de Usuário Simples ---
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id # O ID do usuário será o próprio username
 
-def get_next_sequence_id():
-    """Obtém o próximo sequence_id de forma thread-safe."""
-    global command_sequence_id
-    with sequence_lock:
-        command_sequence_id += 1
-        return str(command_sequence_id) # MQTT espera string
+    # Método necessário pelo Flask-Login para obter o ID do usuário
+    def get_id(self):
+        return str(self.id)
 
-def on_connect(client, userdata, flags, rc, properties=None):
-    """Callback executado quando o cliente se conecta ao broker MQTT."""
-    if rc == 0:
-        print("Conectado ao Broker MQTT da Impressora com sucesso!", flush=True)
-        # Armazena o cliente na aplicação Flask para uso posterior
-        app.mqtt_client = client
-        client.subscribe(TOPIC_REPORT)
-        print(f"Inscrito no tópico: {TOPIC_REPORT}", flush=True)
-        request_full_status(client)
-    else:
-        print(f"Falha na conexão MQTT, código de retorno: {rc}", flush=True)
-        app.mqtt_client = None # Garante que não usemos um cliente inválido
+# Guarda o único usuário permitido (carregado da config)
+# Em uma aplicação real, isso viria de um banco de dados
+the_user = User(id=LOGIN_USERNAME)
 
-def on_disconnect(client, userdata, rc, properties=None):
-    """Callback executado quando o cliente se desconecta."""
-    print(f"Desconectado do Broker MQTT (código: {rc}). Tentando reconectar...", flush=True)
-    app.mqtt_client = None # Cliente não está mais conectado
+@login_manager.user_loader
+def load_user(user_id):
+    """Callback usado pelo Flask-Login para carregar um usuário pelo ID."""
+    if user_id == LOGIN_USERNAME:
+        return the_user
+    return None
 
-def on_message(client, userdata, msg):
-    """Callback executado quando uma mensagem é recebida."""
-    global printer_status
-    try:
-        payload = json.loads(msg.payload.decode('utf-8'))
-        with status_lock:
-            for key, value in payload.items():
-                if isinstance(value, dict):
-                    if key in printer_status and isinstance(printer_status.get(key), dict):
-                        printer_status[key].update(value)
-                    else:
-                        printer_status[key] = value
-    except json.JSONDecodeError:
-        print(f"Erro ao decodificar JSON: {msg.payload.decode()}", flush=True)
-    except Exception as e:
-        print(f"Erro ao processar mensagem MQTT: {e}", flush=True)
-
-def request_full_status(client):
-    """Envia uma solicitação para obter o status completo da impressora."""
-    sequence_id = get_next_sequence_id()
-    request_payload = {
-        "pushing": {
-            "sequence_id": sequence_id,
-            "command": "pushall"
-        }
-    }
-    payload_json = json.dumps(request_payload)
-    print(f"Enviando solicitação 'pushall' (seq: {sequence_id}) para {TOPIC_REQUEST}", flush=True)
-    result = client.publish(TOPIC_REQUEST, payload_json)
-    # print(f"Publish result: {result}") # Debug opcional
-
-def mqtt_thread_func():
-    """Função executada na thread MQTT para lidar com a conexão e loop."""
-    # Cria o cliente DENTRO da thread
-    local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, MQTT_CLIENT_ID)
-    local_client.on_connect = on_connect
-    local_client.on_message = on_message
-    local_client.on_disconnect = on_disconnect
-
-    local_client.username_pw_set(MQTT_USER, MQTT_PASS)
-    local_client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT, cert_reqs=ssl.CERT_NONE)
-    local_client.tls_insecure_set(True)
-
-    print(f"Thread MQTT: Tentando conectar a {PRINTER_IP}:{MQTT_PORT}...", flush=True)
-    try:
-        # Conecta e entra no loop. on_connect definirá app.mqtt_client
-        local_client.connect(PRINTER_IP, MQTT_PORT, 60)
-        local_client.loop_forever()
-    except Exception as e:
-        print(f"Erro fatal na conexão/loop MQTT: {e}", flush=True)
-        app.mqtt_client = None # Garante que app.mqtt_client seja None em caso de falha no loop
-    finally:
-         print("Thread MQTT terminando.", flush=True)
-         app.mqtt_client = None # Garante limpeza ao sair do loop
-
-# --- Funções de Manutenção ---
-
-def read_maintenance_data():
-    """Lê os dados de manutenção do arquivo JSON de forma segura."""
-    with maintenance_lock:
-        try:
-            if not os.path.exists(MAINTENANCE_FILE):
-                # Cria arquivo padrão se não existir
-                default_data = {"totals": {"hours": 0, "prints": 0, "last_updated": None}, "logs": []}
-                with open(MAINTENANCE_FILE, 'w') as f:
-                    json.dump(default_data, f, indent=4)
-                return default_data
-            else:
-                with open(MAINTENANCE_FILE, 'r') as f:
-                    return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            print(f"Erro ao ler/criar {MAINTENANCE_FILE}: {e}", flush=True)
-            # Retorna padrão em caso de erro grave
-            return {"totals": {"hours": 0, "prints": 0, "last_updated": None}, "logs": []}
-
-def write_maintenance_data(data):
-    """Escreve os dados de manutenção no arquivo JSON de forma segura."""
-    with maintenance_lock:
-        try:
-            with open(MAINTENANCE_FILE, 'w') as f:
-                json.dump(data, f, indent=4)
-            return True
-        except IOError as e:
-            print(f"Erro ao escrever {MAINTENANCE_FILE}: {e}", flush=True)
-            return False
+# --- Formulário de Login ---
+class LoginForm(FlaskForm):
+    username = StringField('Usuário', validators=[DataRequired(message="Nome de usuário é obrigatório.")])
+    password = PasswordField('Senha', validators=[DataRequired(message="Senha é obrigatória.")])
+    remember_me = BooleanField('Lembrar-me neste dispositivo')
+    submit = SubmitField('Entrar')
 
 # --- Rotas Flask ---
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Renderiza a página de login e processa o formulário."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    form = LoginForm()
+    if form.validate_on_submit():
+        username_input = form.username.data
+        password_input = form.password.data
+
+        password_check_result = check_password_hash(LOGIN_PASSWORD_HASH, password_input)
+
+        if username_input == LOGIN_USERNAME and password_check_result:
+            login_user(the_user, remember=form.remember_me.data)
+            flash('Login realizado com sucesso!', 'success')
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            flash('Usuário ou senha inválidos.', 'danger')
+
+    return render_template('login.html', title='Login', form=form)
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Desloga o usuário."""
+    logout_user()
+    flash('Você foi desconectado.', 'info')
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required # Protege a rota principal
 def index():
     """Renderiza a página HTML principal."""
     return render_template('index.html')
 
 @app.route('/status')
+# @login_required # REMOVIDO - Acesso permitido para a página /live
 def get_status():
     """Retorna o último status conhecido da impressora em formato JSON."""
     with status_lock:
@@ -192,6 +160,7 @@ def get_status():
 
 # --- Rota para Enviar Comandos MQTT ---
 @app.route('/command', methods=['POST'])
+@login_required # Protege o envio de comandos
 def handle_command():
     """Recebe um comando para ser enviado à impressora."""
     # Log detalhado da requisição recebida
@@ -308,10 +277,10 @@ def handle_command():
         return jsonify({"success": False, "error": f"Erro interno do servidor: {e}"}), 500
 
 # --- Rota para Proxy da Câmera ---
-
 @app.route('/camera_proxy')
+# @login_required # REMOVIDO - Acesso permitido para a página /live
 def camera_proxy():
-    """Atua como proxy para o stream MJPEG da câmera da impressora."""
+    """Atua como um proxy para o stream da câmera, evitando problemas de CORS/Mixed Content."""
     try:
         # Faz a requisição para a câmera, mantendo o stream aberto
         req = requests.get(CAMERA_URL, stream=True, timeout=10) # Aumentar timeout um pouco
@@ -358,14 +327,16 @@ def camera_proxy():
 # --- Rotas Flask de Manutenção ---
 
 @app.route('/maintenance_data')
+@login_required # Protege o acesso aos dados de manutenção
 def get_maintenance_data():
-    """Retorna os dados de manutenção armazenados."""
+    """Retorna os dados de manutenção atuais."""
     data = read_maintenance_data()
     return jsonify(data)
 
 @app.route('/update_totals', methods=['POST'])
+@login_required # Protege a atualização dos totais
 def update_totals():
-    """Atualiza os totais de horas/impressões."""
+    """Atualiza os totais de horas e impressões."""
     try:
         req_data = request.get_json()
         if not req_data or 'hours' not in req_data or 'prints' not in req_data:
@@ -393,8 +364,9 @@ def update_totals():
         return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
 
 @app.route('/log_maintenance', methods=['POST'])
+@login_required # Protege o registro de manutenção
 def log_maintenance():
-    """Registra uma nova entrada de log de manutenção."""
+    """Registra uma nova entrada de manutenção."""
     try:
         req_data = request.get_json()
         if not req_data or 'task' not in req_data:
@@ -425,6 +397,136 @@ def log_maintenance():
     except Exception as e:
         print(f"Erro em /log_maintenance: {e}", flush=True)
         return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+
+# --- NOVA Rota para Visualização Compartilhada ---
+@app.route('/live/<string:token>')
+def live_view(token):
+    """Exibe uma visualização simplificada se o token for válido."""
+    if not LIVE_SHARE_TOKEN:
+        print("AVISO: Tentativa de acesso a /live/ sem LIVE_SHARE_TOKEN configurado.", flush=True)
+        return "Recurso não configurado.", 404
+
+    if token == LIVE_SHARE_TOKEN:
+        # Token válido, renderiza o template simplificado
+        return render_template('live_view.html')
+    else:
+        # Token inválido
+        print(f"AVISO: Tentativa de acesso a /live/ com token inválido: {token}", flush=True)
+        return "Acesso não autorizado.", 403
+# --- Fim da Nova Rota ---
+
+# --- Funções MQTT ---
+
+def get_next_sequence_id():
+    """Obtém o próximo sequence_id de forma thread-safe."""
+    global command_sequence_id
+    with sequence_lock:
+        command_sequence_id += 1
+        return str(command_sequence_id) # MQTT espera string
+
+def on_connect(client, userdata, flags, rc, properties=None):
+    """Callback executado quando o cliente se conecta ao broker MQTT."""
+    if rc == 0:
+        print("Conectado ao Broker MQTT da Impressora com sucesso!", flush=True)
+        # Armazena o cliente na aplicação Flask para uso posterior
+        app.mqtt_client = client
+        client.subscribe(TOPIC_REPORT)
+        print(f"Inscrito no tópico: {TOPIC_REPORT}", flush=True)
+        request_full_status(client)
+    else:
+        print(f"Falha na conexão MQTT, código de retorno: {rc}", flush=True)
+        app.mqtt_client = None # Garante que não usemos um cliente inválido
+
+def on_disconnect(client, userdata, rc, properties=None):
+    """Callback executado quando o cliente se desconecta."""
+    print(f"Desconectado do Broker MQTT (código: {rc}). Tentando reconectar...", flush=True)
+    app.mqtt_client = None # Cliente não está mais conectado
+
+def on_message(client, userdata, msg):
+    """Callback executado quando uma mensagem é recebida."""
+    global printer_status
+    try:
+        payload = json.loads(msg.payload.decode('utf-8'))
+        with status_lock:
+            for key, value in payload.items():
+                if isinstance(value, dict):
+                    if key in printer_status and isinstance(printer_status.get(key), dict):
+                        printer_status[key].update(value)
+                    else:
+                        printer_status[key] = value
+    except json.JSONDecodeError:
+        print(f"Erro ao decodificar JSON: {msg.payload.decode()}", flush=True)
+    except Exception as e:
+        print(f"Erro ao processar mensagem MQTT: {e}", flush=True)
+
+def request_full_status(client):
+    """Envia uma solicitação para obter o status completo da impressora."""
+    sequence_id = get_next_sequence_id()
+    request_payload = {
+        "pushing": {
+            "sequence_id": sequence_id,
+            "command": "pushall"
+        }
+    }
+    payload_json = json.dumps(request_payload)
+    print(f"Enviando solicitação 'pushall' (seq: {sequence_id}) para {TOPIC_REQUEST}", flush=True)
+    result = client.publish(TOPIC_REQUEST, payload_json)
+    # print(f"Publish result: {result}") # Debug opcional
+
+def mqtt_thread_func():
+    """Função executada na thread MQTT para lidar com a conexão e loop."""
+    # Cria o cliente DENTRO da thread
+    local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, MQTT_CLIENT_ID)
+    local_client.on_connect = on_connect
+    local_client.on_message = on_message
+    local_client.on_disconnect = on_disconnect
+
+    local_client.username_pw_set(MQTT_USER, MQTT_PASS)
+    local_client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT, cert_reqs=ssl.CERT_NONE)
+    local_client.tls_insecure_set(True)
+
+    print(f"Thread MQTT: Tentando conectar a {PRINTER_IP}:{MQTT_PORT}...", flush=True)
+    try:
+        # Conecta e entra no loop. on_connect definirá app.mqtt_client
+        local_client.connect(PRINTER_IP, MQTT_PORT, 60)
+        local_client.loop_forever()
+    except Exception as e:
+        print(f"Erro fatal na conexão/loop MQTT: {e}", flush=True)
+        app.mqtt_client = None # Garante que app.mqtt_client seja None em caso de falha no loop
+    finally:
+         print("Thread MQTT terminando.", flush=True)
+         app.mqtt_client = None # Garante limpeza ao sair do loop
+
+# --- Funções de Manutenção ---
+
+def read_maintenance_data():
+    """Lê os dados de manutenção do arquivo JSON de forma segura."""
+    with maintenance_lock:
+        try:
+            if not os.path.exists(MAINTENANCE_FILE):
+                # Cria arquivo padrão se não existir
+                default_data = {"totals": {"hours": 0, "prints": 0, "last_updated": None}, "logs": []}
+                with open(MAINTENANCE_FILE, 'w') as f:
+                    json.dump(default_data, f, indent=4)
+                return default_data
+            else:
+                with open(MAINTENANCE_FILE, 'r') as f:
+                    return json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            print(f"Erro ao ler/criar {MAINTENANCE_FILE}: {e}", flush=True)
+            # Retorna padrão em caso de erro grave
+            return {"totals": {"hours": 0, "prints": 0, "last_updated": None}, "logs": []}
+
+def write_maintenance_data(data):
+    """Escreve os dados de manutenção no arquivo JSON de forma segura."""
+    with maintenance_lock:
+        try:
+            with open(MAINTENANCE_FILE, 'w') as f:
+                json.dump(data, f, indent=4)
+            return True
+        except IOError as e:
+            print(f"Erro ao escrever {MAINTENANCE_FILE}: {e}", flush=True)
+            return False
 
 # --- Inicialização ---
 

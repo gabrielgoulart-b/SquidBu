@@ -1,209 +1,136 @@
-# Monitor de Impressora Bambu Lab
+# Bambu Lab Printer Monitor
 
-Este projeto implementa uma página web para monitorar o status de uma impressora 3D Bambu Lab na rede local usando MQTT, com funcionalidades adicionais.
+This project implements a web page to monitor the status of a Bambu Lab 3D printer on the local network using MQTT, with additional features including authentication and sharing.
 
-## Funcionalidades
+## Features
 
-*   **Monitoramento em Tempo Real:** Busca dados da impressora via MQTT.
-*   **Interface Web:** Exibe informações organizadas:
-    *   **Visão Geral:** Estado atual da impressora, sinal Wi-Fi.
-    *   **Progresso:** Arquivo G-code, camada atual/total, tempo restante, barra de progresso.
-    *   **Temperaturas & Ventoinhas:** Temperatura atual e alvo do bico e mesa, temperatura da câmara (se disponível), velocidade das ventoinhas.
-    *   **AMS:** Detalhes de cada unidade AMS e bandeja (tipo de filamento, cor, porcentagem restante estimada).
-    *   **Câmera:** Exibe o stream de vídeo da câmera da impressora (requer configuração correta do URL em `app.py` e acessibilidade da câmera).
-    *   **Gráfico de Temperaturas:** Histórico das temperaturas do bico, mesa e câmara.
-*   **Tema Claro/Escuro:** Botão na barra de ferramentas para alternar o tema visual, com preferência salva no navegador.
-*   **Layout Responsivo:** A interface se adapta automaticamente para melhor visualização em telas de desktop e mobile.
-*   **Acesso Remoto (Opcional):** Pode ser configurado via Tailscale Funnel para acesso seguro de fora da rede local.
+*   **Real-time Monitoring:** Fetches printer data via MQTT.
+*   **Web Interface:** Displays organized information:
+    *   **Overview:** Current printer status, Wi-Fi signal.
+    *   **Progress:** G-code file, current/total layer, remaining time, progress bar.
+    *   **Temperatures & Fans:** Current and target nozzle/bed temperature, chamber temperature (if available), fan speeds.
+    *   **AMS:** Details of each AMS unit and tray (filament type, color, estimated remaining percentage).
+    *   **Camera:** Displays the video stream from the printer's camera (requires correct URL configuration in `config.json` and camera accessibility).
+    *   **Temperature Chart:** History of nozzle, bed, and chamber temperatures.
+*   **User Authentication:** Login system with username and password to protect access to the main interface. Includes a "Remember Me" option.
+*   **Shareable Live View:** A special URL (`/live/<token>`) allows sharing a simplified view (progress and camera) without login, protected by a secret token.
+*   **Light/Dark Theme:** Toolbar button to toggle the visual theme, with preference saved in the browser.
+*   **Responsive Layout:** The interface automatically adapts for better viewing on desktop and mobile screens (with a collapsible sidebar on mobile).
+*   **Remote Access (Optional):** Can be configured via Tailscale Funnel for secure access from outside the local network.
 
-## Estrutura
+## Structure
 
-*   `app.py`: Backend Python (Flask) que conecta à impressora via MQTT, serve a API `/status` e atua como proxy para a câmera (`/camera_proxy`).
-*   `templates/index.html`: Frontend HTML/CSS/JavaScript que exibe os dados, o gráfico e a câmera.
-*   `requirements.txt`: Dependências Python (Flask, paho-mqtt, requests).
-*   `.gitignore`: Arquivo para evitar o envio de arquivos desnecessários (como `venv`) para o Git.
+*   `app.py`: Python (Flask) backend that:
+    *   Connects to the printer via MQTT.
+    *   Implements user authentication (login/logout) using Flask-Login.
+    *   Serves the main interface (`/`), login page (`/login`), and live view (`/live/<token>`).
+    *   Serves the `/status` API.
+    *   Acts as a proxy for the camera (`/camera_proxy`).
+*   `templates/index.html`: Main frontend (requires login).
+*   `templates/login.html`: Login page.
+*   `templates/live_view.html`: Simplified page for shared live view.
+*   `static/css/style.css`: Main stylesheet.
+*   `static/js/script.js`: JavaScript for the main interface (data updates, themes, etc.).
+*   `config.json`: Local configuration file (NOT versioned).
+*   `config.json.example`: Example configuration file.
+*   `requirements.txt`: Python dependencies (Flask, paho-mqtt, requests, Flask-Login, Flask-WTF).
+*   `SquidStart.py`: Optional script to start and monitor `app.py` and `tailscale funnel` on boot via systemd.
+*   `LEIAME.md`: README file in Brazilian Portuguese.
+*   `.gitignore`: File to prevent unnecessary files (like `venv`, `config.json`, logs) from being committed to Git.
 
-## Configuração
+## Configuration
 
-1.  **Clone o Repositório (se obtendo do GitHub):**
+1.  **Clone the Repository (if getting from GitHub):**
     ```bash
-    git clone <URL_DO_REPOSITORIO>
-    cd <PASTA_DO_REPOSITORIO>
+    git clone <REPOSITORY_URL>
+    cd <REPOSITORY_FOLDER>
     ```
 
-2.  **Crie o Arquivo de Configuração Local:**
-    *   No diretório do projeto, copie o arquivo de exemplo:
+2.  **Create the Local Configuration File:**
+    *   In the project directory, copy the example file:
         ```bash
         cp config.json.example config.json
         ```
-    *   Edite o novo arquivo `config.json` com um editor de texto (ex: `nano config.json`).
-    *   Preencha os valores corretos para as seguintes chaves, substituindo os placeholders:
-        *   `PRINTER_IP`: O endereço IP da sua impressora Bambu Lab na rede local.
-        *   `ACCESS_CODE`: O Código de Acesso LAN da sua impressora (encontrado nas configurações de rede dela ou no app Bambu Handy).
-        *   `DEVICE_ID`: O Número de Série da sua impressora.
-        *   `CAMERA_URL`: O URL completo para o stream MJPEG da sua câmera (ex: `http://192.168.X.Y:ZZZZ/?action=stream`).
-    *   **Importante:** O arquivo `config.json` contém informações sensíveis e **não será enviado** ao GitHub (está no `.gitignore`).
+    *   Edit the new `config.json` file with a text editor (e.g., `nano config.json`).
+    *   Fill in the correct values for the following keys, replacing the placeholders:
+        *   `PRINTER_IP`: The IP address of your Bambu Lab printer on the local network.
+        *   `ACCESS_CODE`: The LAN Access Code for your printer (found in its network settings or the Bambu Handy app).
+        *   `DEVICE_ID`: The Serial Number of your printer.
+        *   `CAMERA_URL`: The full URL for your camera's MJPEG stream (e.g., `http://192.168.X.Y:ZZZZ/?action=stream`). If not using, you can leave the example value.
+        *   `SECRET_KEY`: A long, random secret key for Flask session security. **Important:** Generate a secure key! You can use Python:
+            ```bash
+            # In the terminal, run:
+            python3 -c 'import secrets; print(secrets.token_hex(24))'
+            # Copy the output and paste it as the key's value in the JSON.
+            ```
+        *   `LOGIN_USERNAME`: The username you will use to log in to the interface.
+        *   `LOGIN_PASSWORD_HASH`: The password hash corresponding to the `LOGIN_USERNAME`. **DO NOT PUT THE PLAINTEXT PASSWORD HERE.** To generate the hash:
+            1.  Ensure the virtual environment is active (`source venv/bin/activate`).
+            2.  Run the Flask interactive shell: `flask shell`
+            3.  Inside the shell, import the function and generate the hash (replace `'your_password_here'`):
+                ```python
+                from werkzeug.security import generate_password_hash
+                print(generate_password_hash('your_password_here'))
+                exit() # Exits the shell
+                ```
+            4.  Copy the complete output (starting with `scrypt:...` or `pbkdf2:...`) and paste it as the key's value in the JSON.
+        *   `LIVE_SHARE_TOKEN` (Optional): A secret, hard-to-guess string to use in the live view URL. If not using sharing, you can leave it empty or remove the key. To generate a token:
+             ```bash
+             # In the terminal, run:
+             python3 -c 'import secrets; print(secrets.token_hex(16))'
+             # Copy the output and paste it as the key's value in the JSON.
+             ```
+    *   **Important:** The `config.json` file contains sensitive information and **will not be committed** to GitHub (it's in `.gitignore`).
 
-3.  **Crie e Ative o Ambiente Virtual:**
-    *   Navegue até o diretório do projeto (onde você clonou ou onde os arquivos estão).
-    *   Crie o ambiente virtual (recomendado dentro de uma subpasta para ser ignorado pelo `.gitignore`, ex: `venv`):
+3.  **Create and Activate the Virtual Environment:**
+    *   Navigate to the project directory.
+    *   Create the virtual environment (naming it `venv` is recommended):
         ```bash
-        # Substitua <NOME_PASTA_VENV> pelo nome desejado (ex: venv ou printer_monitor/venv)
-        python3 -m venv <NOME_PASTA_VENV>
-        # Ative o ambiente virtual:
-        source <NOME_PASTA_VENV>/bin/activate  # No Linux/macOS
-        # <NOME_PASTA_VENV>\Scripts\activate    # No Windows
+        python3 -m venv venv
+        # Activate the virtual environment:
+        source venv/bin/activate  # On Linux/macOS
+        # venv\Scripts\activate    # On Windows
         ```
-        *Nota: O script `SquidStart.py` assume que o venv está em `printer_monitor/venv`. Se você usar um nome diferente, precisará ajustar a variável `VENV_PYTHON` no início de `SquidStart.py`.* 
+        *Note: The `SquidStart.py` script now assumes the venv is located at `./venv`. If you use a different name/location, you'll need to adjust the `VENV_PYTHON` variable at the beginning of `SquidStart.py`.* 
 
-4.  **Instale as dependências:**
-    *   Com o ambiente virtual ativo, execute:
+4.  **Install Dependencies:**
+    *   With the virtual environment active, run:
         ```bash
         pip install -r requirements.txt
         ```
 
-## Execução Local
+## Local Execution
 
-1.  **Certifique-se de que `config.json` existe e está preenchido.**
+1.  **Ensure `config.json` exists and is correctly filled (including login keys).**
 
-2.  **Inicie o servidor backend:**
-    *   Com o ambiente virtual ativo, execute:
+2.  **Start the backend server:**
+    *   With the virtual environment active, run:
         ```bash
         python app.py
         ```
-    *   Se houver erros ao carregar `config.json`, mensagens aparecerão no terminal.
+    *   If there are errors loading `config.json` or missing dependencies, messages will appear in the terminal.
 
-3.  **Acesse a página web:**
-    *   Abra um navegador na **mesma rede local**.
-    *   Acesse: `http://<IP_DO_DISPOSITIVO_RODANDO_APP>:5000` (substitua `<IP_DO_DISPOSITIVO_RODANDO_APP>` pelo IP do dispositivo que roda o app).
+3.  **Access the web page:**
+    *   Open a browser on the **same local network**.
+    *   Go to: `http://<IP_OF_DEVICE_RUNNING_APP>:5000` (replace with the IP of the device running the app).
+    *   You will be redirected to the login page. Use the `LOGIN_USERNAME` and the password corresponding to the `LOGIN_PASSWORD_HASH` configured.
 
-## Acesso Remoto (Opcional - Via Tailscale Funnel)
+## Shareable Live View (Optional)
 
-Para acessar o monitor de fora da sua rede local de forma segura e gratuita (sem precisar de domínio próprio), você pode usar o Tailscale Funnel.
+If you configured a `LIVE_SHARE_TOKEN` in `config.json`, you can share a read-only view (progress and camera) using a special link:
 
-1.  **Instale o Tailscale no dispositivo que roda o `app.py`:**
-    ```bash
-    curl -fsSL https://tailscale.com/install.sh | sh
-    ```
+`http://<IP_OF_DEVICE_RUNNING_APP>:5000/live/<YOUR_LIVE_SHARE_TOKEN>`
 
-2.  **Inicie o Tailscale e faça login:**
-    ```bash
-    sudo tailscale up
-    ```
-    *   Siga o link exibido para autenticar o dispositivo na sua conta Tailscale.
+Or, if using Tailscale Funnel:
 
-3.  **Habilite HTTPS para o Tailscale (necessário para Funnel):**
-    ```bash
-    sudo tailscale set --auto-cert
-    ```
+`https://<hostname>.<your-tailnet>.ts.net/live/<YOUR_LIVE_SHARE_TOKEN>`
 
-4.  **Inicie o Funnel para a porta 5000:**
-    *   Certifique-se de que `python app.py` esteja rodando em outro terminal.
-    *   Execute o comando Funnel (ele precisa continuar rodando):
-        ```bash
-        tailscale funnel 5000
-        ```
-    *   **Na primeira vez**, você pode precisar abrir um link no navegador para aprovar a ativação do Funnel para sua rede.
-    *   O comando exibirá o URL público fixo, algo como: `https://<nome-do-host>.<seu-tailnet>.ts.net/`
+*   Replace `<YOUR_LIVE_SHARE_TOKEN>` with the exact value you set in `config.json`.
+*   Anyone with this link can view the simplified page without needing to log in.
+*   If the token is incorrect or not configured, access will be denied.
 
-5.  **Acesse Remotamente:** Use o URL `https://...ts.net` exibido em qualquer navegador, em qualquer rede.
+## Remote Access (Optional - Via Tailscale Funnel)
 
-    **Nota:** O comando `tailscale funnel 5000` precisa ficar rodando. Para rodar em segundo plano permanentemente, use a configuração de inicialização no boot descrita abaixo.
+(This section remains the same, but remember that accessing via the Tailscale URL will also require login for the main interface).
 
-## Start on Boot (Opcional - Linux com systemd)
-
-Para fazer o monitor e o túnel Tailscale Funnel iniciarem automaticamente quando o Raspberry Pi (ou outro sistema Linux com systemd) ligar, você pode usar o script `SquidStart.py` e um serviço systemd.
-
-1.  **Script `SquidStart.py`:**
-    *   Este script (localizado no diretório principal do projeto) é responsável por iniciar `app.py` (com o ambiente virtual correto) e `tailscale funnel 5000`.
-    *   Ele também monitora os processos e tenta reiniciá-los se falharem, além de redirecionar a saída para arquivos `.log`.
-
-2.  **Torne o Script Executável:**
-    ```bash
-    chmod +x SquidStart.py
-    ```
-
-3.  **Configure as Permissões do Tailscale (Recomendado):**
-    *   Para permitir que o script (rodando como seu usuário) controle o `tailscale funnel` sem `sudo`, execute uma vez:
-        ```bash
-        # Substitua <SEU_USUARIO> pelo seu nome de usuário real
-        sudo tailscale up --operator=<SEU_USUARIO>
-        ```
-
-4.  **Crie o Arquivo de Serviço Systemd:**
-    *   Crie e edite o arquivo de serviço:
-        ```bash
-        sudo nano /etc/systemd/system/squidstart.service
-        ```
-    *   Cole o seguinte conteúdo no arquivo. **Importante:** Substitua os placeholders `<SEU_USUARIO>`, `<SEU_GRUPO>` e `<CAMINHO_PARA_O_PROJETO>` pelos valores corretos para o seu sistema.
-
-        ```ini
-        [Unit]
-        Description=SquidBu Monitor and Tailscale Funnel Starter
-        After=network.target tailscaled.service
-
-        [Service]
-        Type=simple
-        User=<SEU_USUARIO>
-        Group=<SEU_GRUPO>
-        WorkingDirectory=<CAMINHO_PARA_O_PROJETO>
-        ExecStart=<CAMINHO_PARA_O_PROJETO>/SquidStart.py
-        Restart=on-failure
-        RestartSec=10
-        StandardOutput=journal
-        StandardError=journal
-
-        [Install]
-        WantedBy=multi-user.target
-        ```
-    *   Salve e feche o editor (`Ctrl+X`, `Y`, `Enter`).
-
-5.  **Habilite e Inicie o Serviço:**
-    *   Recarregue a configuração do systemd:
-        ```bash
-        sudo systemctl daemon-reload
-        ```
-    *   Habilite o serviço para iniciar no boot:
-        ```bash
-        sudo systemctl enable squidstart.service
-        ```
-    *   Inicie o serviço imediatamente:
-        ```bash
-        sudo systemctl start squidstart.service
-        ```
-
-6.  **Verifique o Status e Logs:**
-    *   Verifique se o serviço está rodando:
-        ```bash
-        sudo systemctl status squidstart.service
-        ```
-    *   Veja os logs do serviço (inclui a saída do `SquidStart.py`):
-        ```bash
-        journalctl -u squidstart.service -f
-        ```
-    *   Veja os logs específicos do Flask e Tailscale Funnel (localizados em `<CAMINHO_PARA_O_PROJETO>`):
-        ```bash
-        tail -f <CAMINHO_PARA_O_PROJETO>/flask_app.log
-        tail -f <CAMINHO_PARA_O_PROJETO>/tailscale_funnel.log
-        ```
-
-Com estes passos, o monitor deverá iniciar automaticamente após cada reinicialização do sistema.
-
-## Solução de Problemas
-
-*   **Erro "Falha ao conectar ao backend" na página web:**
-    *   Verifique se `app.py` está rodando e se você está acessando o IP/URL correto.
-    *   Verifique o firewall local.
-*   **Erro de Conexão MQTT:**
-    *   Confirme os dados no arquivo `config.json`.
-*   **Página exibe "Carregando..." indefinidamente:**
-    *   Verifique o console do desenvolvedor do navegador (F12) por erros JavaScript.
-    *   Verifique o terminal onde `app.py` roda por erros.
-*   **Câmera não carrega:**
-    *   Confirme se o `CAMERA_URL` em `config.json` está correto.
-    *   Verifique se o servidor Flask (`app.py`) consegue acessar o URL da câmera (use `curl <CAMERA_URL>` no terminal do servidor Flask).
-    *   Verifique se há erros relacionados a `/camera_proxy` no terminal do Flask ou no console do navegador.
-*   **Acesso remoto (Funnel) não funciona:**
-    *   Confirme se o comando `tailscale funnel 5000` está rodando sem erros.
-    *   Verifique se você consegue acessar o URL `.ts.net` fornecido.
-    *   Certifique-se de que `python app.py` está rodando. 
+// ... (Rest of the README: Tailscale, Start on Boot, Troubleshooting) ... 

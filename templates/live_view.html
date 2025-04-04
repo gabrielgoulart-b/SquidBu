@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SquidBu - Live View</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; }
+        h1 { font-size: 1.5em; }
+        h2 { font-size: 1.2em; }
+        .live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .status-item { background-color: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 5px; font-size: 0.9em; }
+        .status-item strong { display: block; margin-bottom: 3px; color: #666; font-size: 0.9em; }
+        .status-value { font-size: 1.1em; font-weight: bold; color: #000; word-wrap: break-word; }
+        #camera-feed { width: 100%; height: auto; border: 1px solid #ddd; background-color: #e0e0e0; display: block; transform: rotate(180deg); }
+        .progress-bar-container { width: 100%; background-color: #e0e0e0; border-radius: 4px; margin-top: 5px; overflow: hidden; height: 24px; }
+        .progress-bar { height: 100%; background-color: #4CAF50; width: 0%; border-radius: 4px; text-align: center; line-height: 24px; color: white; font-weight: bold; transition: width 0.5s ease-in-out; white-space: nowrap; overflow: hidden; }
+        .loading { text-align: center; padding: 20px; color: #888; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SquidBu - Live View</h1>
+        <div id="error-message" class="error" style="display: none;"></div>
+
+        <div class="live-grid">
+            <div id="progress-section">
+                <h2>Progresso da Impressão</h2>
+                <div id="status-progress" class="status-grid">
+                    <div class="loading">Carregando dados...</div>
+                </div>
+                <div id="progress-bar-section" style="margin-top: 15px;"></div>
+            </div>
+
+            <div id="camera-section">
+                <h2>Feed da Câmera</h2>
+                <img id="camera-feed" src="{{ url_for('camera_proxy') }}" alt="Camera Feed"/>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusProgressDiv = document.getElementById('status-progress');
+        const progressBarSection = document.getElementById('progress-bar-section');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        function formatTime(seconds) {
+            if (seconds === null || seconds === undefined || seconds < 0) return '--';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        function updateUI(data) {
+            errorMessageDiv.style.display = 'none';
+            statusProgressDiv.innerHTML = ''; // Limpa antes de adicionar
+            progressBarSection.innerHTML = '';
+
+            const printStatus = data.print || {};
+            const mcPrintPercent = printStatus.mc_percent !== undefined ? printStatus.mc_percent : null;
+            const mcRemainingTime = printStatus.mc_remaining_time !== undefined ? printStatus.mc_remaining_time : null;
+            const gcodeFile = printStatus.gcode_file || 'N/A';
+            const currentLayer = printStatus.layer_num !== undefined ? printStatus.layer_num : '--';
+            const totalLayers = printStatus.total_layer_num !== undefined ? printStatus.total_layer_num : '--';
+
+            // Adiciona itens de progresso
+            statusProgressDiv.innerHTML = `
+                <div class="status-item"><strong>Arquivo:</strong> <span class="status-value">${gcodeFile}</span></div>
+                <div class="status-item"><strong>Camada:</strong> <span class="status-value">${currentLayer} / ${totalLayers}</span></div>
+                <div class="status-item"><strong>Tempo Restante:</strong> <span class="status-value">${formatTime(mcRemainingTime)}</span></div>
+            `;
+
+            // Adiciona barra de progresso
+            if (mcPrintPercent !== null) {
+                 const progressBarContainer = document.createElement('div');
+                 progressBarContainer.className = 'progress-bar-container';
+                 const progressBar = document.createElement('div');
+                 progressBar.className = 'progress-bar';
+                 progressBar.style.width = `${mcPrintPercent}%`;
+                 progressBar.textContent = `${mcPrintPercent}%`;
+                 progressBarContainer.appendChild(progressBar);
+                 progressBarSection.appendChild(progressBarContainer);
+             }
+        }
+
+        function fetchStatus() {
+            fetch("{{ url_for('get_status') }}")
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Falha ao buscar status: ${response.status} ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (Object.keys(data).length === 0) {
+                         // Se objeto vazio, talvez não tenha recebido dados ainda
+                         statusProgressDiv.innerHTML = '<div class="loading">Aguardando dados da impressora...</div>';
+                    } else {
+                         updateUI(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar status:', error);
+                    errorMessageDiv.textContent = `Erro ao conectar ao backend: ${error.message}`;
+                    errorMessageDiv.style.display = 'block';
+                    statusProgressDiv.innerHTML = '<div class="error">Falha ao carregar dados.</div>';
+                    progressBarSection.innerHTML = '';
+                });
+        }
+
+        // Busca inicial e define intervalo para atualização
+        fetchStatus();
+        setInterval(fetchStatus, 5000); // Atualiza a cada 5 segundos
+
+        // Recarrega a imagem da câmera periodicamente para contornar streams que travam
+         const cameraFeed = document.getElementById('camera-feed');
+         if (cameraFeed) {
+             setInterval(() => {
+                 // Adiciona um parâmetro inútil para evitar cache
+                 cameraFeed.src = "{{ url_for('camera_proxy') }}" + "?t=" + new Date().getTime();
+             }, 30000); // Recarrega a cada 30 segundos
+         }
+
+    </script>
+
+</body>
+</html> 

@@ -1,3 +1,5 @@
 Flask
 paho-mqtt
-requests 
+requests
+Flask-Login
+Flask-WTF 

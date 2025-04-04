@@ -3,7 +3,7 @@
     /* Tema Claro (Padrão) */
     --bg-color: #f4f4f4;
     --text-color: #333;
-    --container-bg: #fff;
+    --container-bg: #fff; /* Fundo principal do conteúdo */
     --item-bg: #f9f9f9;
     --item-alt-bg: #f0f0f0;
     --border-color: #ddd;
@@ -19,20 +19,21 @@
     --button-bg: #e0e0e0;
     --button-text: #333;
     --shadow-color: rgba(0,0,0,0.1);
-    --sidebar-bg: #e9ecef;
+    /* CORRIGIDO: Sidebar usa o mesmo fundo do container */
+    --sidebar-bg: var(--container-bg);
     --sidebar-link-color: #495057;
     --sidebar-link-hover-bg: #ced4da;
-    --sidebar-link-active-bg: #007bff;
-    --sidebar-link-active-color: #fff;
+    --sidebar-link-active-bg: var(--success-color); /* CORRIGIDO: Destaque verde */
+    --sidebar-link-active-color: #fff; /* Mantém texto branco no destaque */
 }
 
 body.dark-theme {
     /* Tema Escuro */
-    --bg-color: #000000;
+    --bg-color: #121212; /* Ajustado para um cinza escuro, não preto puro */
     --text-color: #dee2e6;
-    --container-bg: #181818;
-    --item-bg: #282828;
-    --item-alt-bg: #383838;
+    --container-bg: #1e1e1e; /* Fundo principal do conteúdo */
+    --item-bg: #2a2a2a;
+    --item-alt-bg: #333333;
     --border-color: #444;
     --border-light-color: #333;
     --link-color: #77b3ff;
@@ -46,11 +47,12 @@ body.dark-theme {
     --button-bg: #444;
     --button-text: #f8f9fa;
     --shadow-color: rgba(255,255,255,0.05);
-    --sidebar-bg: #212529;
+     /* CORRIGIDO: Sidebar usa o mesmo fundo do container */
+    --sidebar-bg: var(--container-bg);
     --sidebar-link-color: #adb5bd;
     --sidebar-link-hover-bg: #343a40;
-    --sidebar-link-active-bg: #007bff;
-    --sidebar-link-active-color: #fff;
+    --sidebar-link-active-bg: var(--success-color); /* CORRIGIDO: Destaque verde */
+    --sidebar-link-active-color: #fff; /* Mantém texto branco no destaque */
 }
 
 body {
@@ -72,9 +74,15 @@ body {
     left: 0;
     top: 0;
     overflow-y: auto; /* Adiciona scroll se necessário */
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    z-index: 1000;
-    transition: background-color 0.3s;
+    box-shadow: 2px 0 5px var(--shadow-color); /* Mantém sombra */
+    z-index: 1020; /* Aumentado para ficar sobre o main em mobile */
+    transition: transform 0.3s ease, background-color 0.3s; /* Adiciona transform */
+    transform: translateX(0); /* Estado inicial visível */
+}
+
+/* Estilo para sidebar recolhida */
+#sidebar.collapsed {
+    transform: translateX(-100%);
 }
 
 #sidebar h2 {
@@ -114,10 +122,16 @@ body {
 
 
 #main-content {
-    margin-left: 200px; /* Espaço para a sidebar */
+    margin-left: 200px; /* Espaço inicial para a sidebar */
     flex-grow: 1; /* Ocupa o resto do espaço */
-    padding: 0; /* Remover padding do main, colocar nos containers internos se necessário */
+    padding: 0;
     position: relative; /* Para posicionar a toolbar */
+    transition: margin-left 0.3s ease; /* Adiciona transição */
+}
+
+/* Ajuste para quando a sidebar está recolhida */
+#sidebar.collapsed + #main-content {
+    margin-left: 0;
 }
 
 #toolbar {
@@ -126,14 +140,32 @@ body {
     border-bottom: 1px solid var(--border-color);
     box-shadow: 0 1px 3px var(--shadow-color);
     display: flex;
-    justify-content: space-between;
+    /* justify-content: space-between; */ /* Removido para alinhar menu à esquerda */
     align-items: center;
     position: sticky;
     top: 0;
-    z-index: 1010;
+    z-index: 1010; /* Mantido, sidebar ficará acima se precisar */
     font-size: 0.9em;
-    width: 100%; /* Garante que ocupe a largura da área de conteúdo */
-    box-sizing: border-box; /* Inclui padding na largura */
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Estilo para o botão de menu */
+#menu-toggle {
+    background: none;
+    border: none;
+    font-size: 1.5em; /* Tamanho do ícone */
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 0 10px 0 0; /* Espaçamento */
+    margin-right: 10px; /* Espaço antes dos itens da toolbar */
+    display: none; /* Escondido por padrão em telas maiores */
+}
+
+#toolbar-temps {
+    margin-left: auto; /* Empurra temps e botão de tema para a direita */
+    display: flex;
+    align-items: center;
 }
 
 #toolbar-temps span {
@@ -284,8 +316,12 @@ body.dark-theme .chartjs-render-monitor {
 
 
 /* Media Query para Telas Menores (Responsividade) */
-@media (max-width: 992px) { /* Ajuste ponto de quebra se necessário */
-     #dashboard-content #layout-container {
+@media (max-width: 992px) {
+    #sidebar {
+        /* Em telas médias, ainda pode ficar visível por padrão se houver espaço */
+        /* Ou pode optar por escondê-la aqui também */
+    }
+    #dashboard-content #layout-container {
         flex-direction: column;
     }
     #dashboard-content #left-column,
@@ -298,31 +334,51 @@ body.dark-theme .chartjs-render-monitor {
 
 @media (max-width: 768px) {
     #sidebar {
-        width: 60px; /* Reduz a largura da sidebar */
-        padding: 10px 5px;
+        transform: translateX(-100%); /* Começa escondida */
+        z-index: 1030; /* Garante que fique sobre a toolbar ao abrir */
+        box-shadow: 3px 0 6px rgba(0,0,0,0.2); /* Sombra mais pronunciada ao abrir */
     }
-    #sidebar h2 {
-        display: none; /* Esconde o título */
+    #sidebar.collapsed {
+        transform: translateX(-100%); /* Redundante, mas garante estado inicial */
     }
-     #sidebar ul li a {
-        padding: 10px;
-        text-align: center;
+     #sidebar:not(.collapsed) { /* Quando está visível (não colapsada) */
+        transform: translateX(0);
     }
-    #sidebar ul li a .link-text {
-        display: none; /* Esconde o texto dos links */
-    }
-     /* Adicionar ícones aqui seria ideal */
 
     #main-content {
-        margin-left: 60px; /* Ajusta a margem para a sidebar reduzida */
+        margin-left: 0 !important; /* Remove a margem SEMPRE em mobile */
+    }
+    /* Sidebar colapsada não afeta mais o main em mobile */
+    /* #sidebar.collapsed + #main-content { margin-left: 0; } */ /* Removido/Comentado */
+
+    #menu-toggle {
+        display: block; /* Mostra o botão de menu */
     }
 
     #toolbar {
-        padding: 5px 10px;
-        font-size: 0.8em;
+        /* Garante padding mesmo com botão de menu */
+        padding-left: 15px;
+        padding-right: 15px;
     }
+
     #toolbar-temps span {
-        margin-right: 8px;
+        margin-right: 10px; /* Menos espaço entre temps */
+        font-size: 0.85em; /* Fonte ligeiramente menor */
+    }
+
+    #sidebar h2 {
+        display: block !important; /* Garante que o título apareça */
+        font-size: 1.1em; /* Ajusta tamanho se necessário */
+        margin-bottom: 15px; /* Espaçamento */
+        padding-bottom: 8px; /* Linha */
+        border-bottom: 1px solid var(--border-color);
+    }
+     #sidebar ul li a span.link-text {
+        display: inline !important; /* Garante que o texto do link apareça */
+    }
+     #sidebar ul li a {
+        display: block !important; /* Garante que o link como um todo apareça */
+        padding: 10px 15px; /* Padding original */
     }
 
     .content-section .container {
@@ -348,14 +404,11 @@ body.dark-theme .chartjs-render-monitor {
 
 @media (max-width: 480px) {
      /* Ajustes ainda menores se necessário */
-     #sidebar {
-        width: 50px;
-     }
-     #main-content {
-        margin-left: 50px;
-     }
+     /* REMOVIDO: #sidebar { width: 50px; } */
+     /* REMOVIDO: #main-content { margin-left: 50px; } */
+
      #toolbar-temps span { /* Esconde alguns itens da toolbar se ficar muito cheio */
-        /* display: none; */ /* Exemplo */
+         /* display: none; */ /* Exemplo */
      }
 }
 

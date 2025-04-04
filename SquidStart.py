@@ -7,7 +7,7 @@ import signal
 
 # --- Configuração ---
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__)) # Diretório onde SquidStart.py está
-VENV_PYTHON = os.path.join(PROJECT_DIR, 'printer_monitor', 'venv', 'bin', 'python')
+VENV_PYTHON = os.path.join(PROJECT_DIR, 'venv', 'bin', 'python')
 APP_SCRIPT = os.path.join(PROJECT_DIR, 'app.py')
 TAILSCALE_CMD = ['tailscale', 'funnel', '5000'] # Comando para iniciar o Funnel
 FLASK_LOG = os.path.join(PROJECT_DIR, 'flask_app.log')

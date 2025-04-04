@@ -19,11 +19,13 @@
             <li><a href="#controle-content"><span class="link-text">Controle</span></a></li>
             <li><a href="#energia-content"><span class="link-text">Energia</span></a></li>
             <li><a href="#manutencao-content"><span class="link-text">Manutenção</span></a></li>
+            <li style="margin-top: 20px;"><a href="{{ url_for('logout') }}"><span class="link-text">Logout</span></a></li>
         </ul>
     </nav>
 
     <main id="main-content">
         <div id="toolbar">
+            <button id="menu-toggle">☰</button>
             <div id="toolbar-temps">
                 <span>🔥 <span id="toolbar-nozzle-value">-- / --</span> °C</span>
                 <span>⏹️ <span id="toolbar-bed-value">-- / --</span> °C</span>
@@ -267,5 +269,92 @@
 
     <!-- Link para o JS externo -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <!-- ADD START: Código JS da Sidebar Corrigido -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuToggle = document.getElementById('menu-toggle');
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+
+            if (!menuToggle || !sidebar || !mainContent) {
+                console.error("Sidebar toggle elements not found!");
+                return; // Impede a execução se elementos essenciais não forem encontrados
+            }
+
+            // Cria o overlay escuro para fechar a sidebar em mobile
+            function createOverlay() {
+                 const overlay = document.createElement('div');
+                 overlay.id = 'sidebar-overlay';
+                 overlay.style.position = 'fixed';
+                 overlay.style.top = '0';
+                 overlay.style.left = '0';
+                 overlay.style.width = '100%';
+                 overlay.style.height = '100%';
+                 overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                 overlay.style.zIndex = '1025'; // Abaixo da sidebar (1030), acima do conteúdo e toolbar (1010)
+                 overlay.onclick = toggleSidebar; // Fecha a sidebar ao clicar no overlay
+                 mainContent.appendChild(overlay);
+                 console.log("Overlay criado");
+            }
+
+            // Remove o overlay
+            function removeOverlay() {
+                const overlay = document.getElementById('sidebar-overlay');
+                if (overlay) {
+                    overlay.remove();
+                    console.log("Overlay removido");
+                }
+            }
+
+            // Alterna a visibilidade da sidebar e do overlay
+            function toggleSidebar() {
+                const isCollapsed = sidebar.classList.toggle('collapsed');
+                console.log("Sidebar collapsed:", isCollapsed);
+                if (!isCollapsed && window.innerWidth <= 768) {
+                    // Se abriu e é mobile, cria overlay (se não existir)
+                    if (!document.getElementById('sidebar-overlay')) {
+                       createOverlay();
+                    }
+                } else {
+                    // Se fechou ou não é mobile, remove overlay
+                    removeOverlay();
+                }
+            }
+
+            // Define o estado inicial da sidebar (aberta/fechada) e margem do conteúdo
+             function initialSidebarState() {
+                 if (window.innerWidth <= 768) {
+                     sidebar.classList.add('collapsed');
+                     mainContent.style.marginLeft = '0';
+                     removeOverlay(); // Garante que não haja overlay no início
+                 } else {
+                     sidebar.classList.remove('collapsed');
+                     mainContent.style.marginLeft = '200px';
+                     removeOverlay(); // Garante que não haja overlay no início
+                 }
+                 console.log("Estado inicial da sidebar definido. Collapsed:", sidebar.classList.contains('collapsed'));
+             }
+
+            // Configuração inicial e listeners
+            initialSidebarState();
+            menuToggle.addEventListener('click', toggleSidebar);
+            window.addEventListener('resize', initialSidebarState);
+
+            // Listener para fechar a sidebar em mobile ao clicar num link dela
+            const sidebarLinks = sidebar.querySelectorAll('ul li a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 768 && !sidebar.classList.contains('collapsed')) {
+                        console.log("Link da sidebar clicado em mobile, fechando sidebar.");
+                        toggleSidebar();
+                    }
+                    // Navegação padrão do link ocorrerá normalmente
+                });
+            });
+        });
+    </script>
+    <!-- ADD END: Código JS da Sidebar Corrigido -->
+
 </body>
 </html> 
