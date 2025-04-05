@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "SquidBu",
+  "short_name": "SquidBu",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
