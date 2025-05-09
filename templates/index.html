@@ -224,20 +224,15 @@
                 <div class="maintenance-grid">
                     <!-- Totais -->
                     <div class="maintenance-group totals-group">
-                        <h2>Totais da Impressora</h2>
+                        <h2>Estatísticas da Impressora</h2>
                         <div class="totals-display">
                             <p><span class="label">Horas de Impressão:</span> <span id="total-hours">--</span></p>
                             <p><span class="label">Total de Impressões:</span> <span id="total-prints">--</span></p>
+                            <p><span class="label">Horas Ligada (Uptime):</span> <span id="power-on-hours">--</span></p>
                             <p><span class="label">Última Atualização:</span> <span id="totals-last-updated">--</span></p>
                         </div>
-                        <div class="totals-update">
-                             <label for="update-hours-input">Atualizar Horas:</label>
-                             <input type="number" id="update-hours-input" step="0.1" min="0" placeholder="Ex: 150.5">
-                             <label for="update-prints-input">Atualizar Impressões:</label>
-                             <input type="number" id="update-prints-input" step="1" min="0" placeholder="Ex: 30">
-                             <button id="update-totals-button" class="control-button">Salvar Totais</button>
-                             <div id="totals-status" class="status-message"></div>
-                        </div>
+                        <button id="force-update-button" class="control-button">Forçar Atualização</button>
+                        <div id="totals-status" class="status-message"></div>
                     </div>
 
                     <!-- Registrar Nova Manutenção -->
@@ -273,12 +268,13 @@
                                          <th>Tarefa</th>
                                          <th>Horas Imp. (no log)</th>
                                          <th>Nº Imp. (no log)</th>
+                                         <th>Usuário</th>
                                          <th>Observações</th>
                                      </tr>
                                  </thead>
                                  <tbody>
                                      <!-- Linhas serão adicionadas pelo JS -->
-                                     <tr><td colspan="5" class="loading">Carregando histórico...</td></tr>
+                                     <tr><td colspan="6" class="loading">Carregando histórico...</td></tr>
                                  </tbody>
                              </table>
                          </div>

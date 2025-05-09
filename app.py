@@ -13,6 +13,7 @@ from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired
 from werkzeug.security import generate_password_hash, check_password_hash
 from pywebpush import webpush, WebPushException
+import certifi
 
 # --- Carregar Configuração ---
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
@@ -62,8 +63,9 @@ VAPID_ENABLED = config.get('VAPID_ENABLED', False)
 # -----------------------------------
 
 MQTT_PORT = 8883
-MQTT_USER = "bblp"
-MQTT_PASS = ACCESS_CODE
+# Comentando autenticação MQTT - Desabilitado para uso sem autenticação
+MQTT_USER = None  # Antes: "bblp"
+MQTT_PASS = None  # Antes: ACCESS_CODE
 MQTT_CLIENT_ID = f"web_monitor_{int(time.time())}" # ID único do cliente
 
 # Tópicos MQTT
@@ -166,8 +168,92 @@ def index():
 # @login_required # REMOVIDO - Acesso permitido para a página /live
 def get_status():
     """Retorna o último status conhecido da impressora em formato JSON."""
+    from db_manager import SensorManager
+    
     with status_lock:
         current_status = printer_status.copy()
+    
+    # Adiciona os dados dos sensores ESP32 às bandejas do AMS
+    try:
+        # Busca os dados mais recentes dos sensores para cada caixa do ESP32
+        esp32_data = {}
+        for box_num in range(1, 5):  # Caixas de 1 a 4
+            source = f"ESP32_Box{box_num}"
+            
+            # Obter entradas separadas para temperatura, umidade e peso restante
+            # e usar a mais recente de cada uma
+            temp_data = SensorManager.get_recent_sensor_data(source=source, limit=5)
+            latest_temp = None
+            latest_humidity = None
+            latest_remaining = None
+            
+            # Processar os dados encontrando os valores mais recentes
+            for data in temp_data:
+                if data.temperature is not None and latest_temp is None:
+                    latest_temp = data.temperature
+                if data.humidity is not None and latest_humidity is None:
+                    latest_humidity = data.humidity
+                if data.ams_filament_remaining is not None and latest_remaining is None:
+                    latest_remaining = data.ams_filament_remaining
+                
+                # Se encontrou todos os valores, podemos parar
+                if latest_temp is not None and latest_humidity is not None and latest_remaining is not None:
+                    break
+            
+            # Dados válidos apenas se todos os valores necessários existirem
+            if latest_temp is not None or latest_humidity is not None or latest_remaining is not None:
+                esp32_data[box_num-1] = {
+                    'temperature': latest_temp,
+                    'humidity': latest_humidity,
+                    'remaining_g': latest_remaining
+                }
+        
+        # Adiciona esses dados aos objetos de bandeja do AMS
+        if 'print' in current_status:
+            # Para AMS Lite (A1 Mini)
+            if 'stg' in current_status['print'] and current_status['print']['stg']:
+                for tray in current_status['print']['stg']:
+                    if 'id' in tray:
+                        # Converte id para inteiro para garantir compatibilidade
+                        tray_id = int(tray['id']) if not isinstance(tray['id'], int) else tray['id']
+                        if tray_id in esp32_data:
+                            tray['dht_temp'] = esp32_data[tray_id]['temperature']
+                            tray['dht_humidity'] = esp32_data[tray_id]['humidity']
+                            
+                            # Garante que remaining_g seja prioritário e substitua remain
+                            if esp32_data[tray_id]['remaining_g'] is not None:
+                                tray['remaining_g'] = esp32_data[tray_id]['remaining_g']
+                                # Sobrescreve 'remain' para garantir que o frontend use remaining_g
+                                if 'remain' in tray:
+                                    # Se o remain existe, converte o remaining_g para porcentagem para manter consistência
+                                    filament_max = 1000.0  # Valor padrão em gramas para um carretel completo
+                                    remain_percent = min(100, max(0, (esp32_data[tray_id]['remaining_g'] / filament_max) * 100))
+                                    tray['remain'] = remain_percent
+            
+            # Para AMS padrão (X1/P1)
+            if 'ams' in current_status['print'] and current_status['print']['ams'] and 'ams' in current_status['print']['ams']:
+                for unit in current_status['print']['ams']['ams']:
+                    if 'tray' in unit:
+                        for tray in unit['tray']:
+                            if 'id' in tray:
+                                # Converte id para inteiro para garantir compatibilidade
+                                tray_id = int(tray['id']) if not isinstance(tray['id'], int) else tray['id']
+                                if tray_id in esp32_data:
+                                    tray['dht_temp'] = esp32_data[tray_id]['temperature']
+                                    tray['dht_humidity'] = esp32_data[tray_id]['humidity']
+                                    
+                                    # Garante que remaining_g seja prioritário e substitua remain
+                                    if esp32_data[tray_id]['remaining_g'] is not None:
+                                        tray['remaining_g'] = esp32_data[tray_id]['remaining_g']
+                                        # Sobrescreve 'remain' para garantir que o frontend use remaining_g
+                                        if 'remain' in tray:
+                                            # Se o remain existe, converte o remaining_g para porcentagem para manter consistência
+                                            filament_max = 1000.0  # Valor padrão em gramas para um carretel completo
+                                            remain_percent = min(100, max(0, (esp32_data[tray_id]['remaining_g'] / filament_max) * 100))
+                                            tray['remain'] = remain_percent
+    except Exception as e:
+        print(f"Erro ao adicionar dados do ESP32 ao status: {e}", flush=True)
+    
     return jsonify(current_status)
 
 # --- Rota para Enviar Comandos MQTT ---
@@ -374,69 +460,113 @@ def camera_proxy():
 @login_required # Protege o acesso aos dados de manutenção
 def get_maintenance_data():
     """Retorna os dados de manutenção atuais."""
-    data = read_maintenance_data()
-    return jsonify(data)
-
-@app.route('/update_totals', methods=['POST'])
-@login_required # Protege a atualização dos totais
-def update_totals():
-    """Atualiza os totais de horas e impressões."""
     try:
-        req_data = request.get_json()
-        if not req_data or 'hours' not in req_data or 'prints' not in req_data:
-            return jsonify({"success": False, "error": "Payload inválido (esperado 'hours' e 'prints')."}), 400
-
-        hours = req_data.get('hours')
-        prints = req_data.get('prints')
-
-        # Validação simples
-        if not isinstance(hours, (int, float)) or hours < 0 or not isinstance(prints, int) or prints < 0:
-             return jsonify({"success": False, "error": "Valores inválidos para horas ou impressões."}), 400
-
-        maint_data = read_maintenance_data()
-        maint_data['totals']['hours'] = hours
-        maint_data['totals']['prints'] = prints
-        maint_data['totals']['last_updated'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        if write_maintenance_data(maint_data):
-            return jsonify({"success": True, "message": "Totais de manutenção atualizados."})
-        else:
-            return jsonify({"success": False, "error": "Falha ao salvar os totais."}), 500
-
+        from db_manager import MaintenanceManager, StatsManager, UserManager
+        
+        # Obter as estatísticas da impressora
+        app.logger.info("Obtendo estatísticas da impressora")
+        stats = StatsManager.get_printer_stats()
+        
+        if not stats:
+            app.logger.warning("Nenhuma estatística encontrada, criando estatísticas iniciais")
+            # Criar estatísticas iniciais se não existirem
+            StatsManager.update_printer_stats(hours=0, prints=0, power_on_hours=0)
+            stats = StatsManager.get_printer_stats()
+        
+        # Obter os logs de manutenção
+        app.logger.info("Obtendo logs de manutenção")
+        logs = MaintenanceManager.get_maintenance_logs()
+        
+        # Formatar os dados no formato esperado pelo frontend
+        logs_formatted = []
+        for log in logs:
+            # Buscar o nome do usuário se houver um user_id
+            username = None
+            if log.user_id:
+                user = UserManager.get_user_by_id(log.user_id)
+                username = user.username if user else None
+                
+            logs_formatted.append({
+                "timestamp": log.performed_at.strftime('%Y-%m-%d %H:%M:%S'),
+                "task": log.task,
+                "hours_at_log": log.hours_at_log,
+                "prints_at_log": log.prints_at_log,
+                "user": username or "Sistema",
+                "notes": log.notes or ""
+            })
+        
+        # Criar o objeto de resposta
+        response_data = {
+            "totals": {
+                "hours": stats.total_print_hours if stats else 0,
+                "prints": stats.total_prints if stats else 0,
+                "power_on_hours": stats.power_on_hours if stats else 0,
+                "last_updated": stats.last_updated.strftime('%Y-%m-%d %H:%M:%S') if stats and stats.last_updated else None
+            },
+            "logs": logs_formatted
+        }
+        
+        app.logger.info(f"Retornando dados de manutenção: estatísticas e {len(logs_formatted)} logs")
+        return jsonify(response_data)
     except Exception as e:
-        print(f"Erro em /update_totals: {e}", flush=True)
-        return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+        app.logger.error(f"Erro ao obter dados de manutenção: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": f"Erro ao obter dados: {str(e)}"}), 500
+
+@app.route('/force_stats_update', methods=['POST'])
+@login_required # Protege o acesso à atualização forçada
+def force_stats_update():
+    """Força uma atualização imediata das estatísticas da impressora."""
+    try:
+        app.logger.info("Solicitação para forçar atualização de estatísticas recebida")
+        
+        # Verificar se temos uma instância MQTT ativa
+        if not hasattr(app, 'mqtt_integration') or not app.mqtt_integration:
+            app.logger.error("Integração MQTT não disponível")
+            return jsonify({"success": False, "error": "Integração MQTT não disponível"}), 500
+        
+        # Solicitar atualização
+        success = app.mqtt_integration.force_stats_update()
+        if success:
+            app.logger.info("Solicitação de atualização de estatísticas enviada com sucesso")
+            return jsonify({
+                "success": True, 
+                "message": "Solicitação de atualização enviada. Aguarde alguns segundos para que os dados sejam atualizados."
+            })
+        else:
+            app.logger.warning("Falha ao solicitar atualização de estatísticas")
+            return jsonify({"success": False, "error": "Falha ao solicitar atualização de estatísticas"}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Erro ao forçar atualização de estatísticas: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": f"Erro: {str(e)}"}), 500
 
 @app.route('/log_maintenance', methods=['POST'])
 @login_required # Protege o registro de manutenção
 def log_maintenance():
     """Registra uma nova entrada de manutenção."""
     try:
+        from db_manager import MaintenanceManager
+        from flask_login import current_user
+        
         req_data = request.get_json()
         if not req_data or 'task' not in req_data:
              return jsonify({"success": False, "error": "Payload inválido (esperado 'task')."}), 400
 
         task = req_data.get('task')
         notes = req_data.get('notes', '') # Notas são opcionais
-
-        maint_data = read_maintenance_data()
-        current_totals = maint_data.get('totals', {"hours": 0, "prints": 0})
-
-        new_log_entry = {
-            "timestamp": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            "task": task,
-            "hours_at_log": current_totals.get('hours', 0),
-            "prints_at_log": current_totals.get('prints', 0),
-            "notes": notes
-        }
-
-        # Adiciona no início da lista para mostrar mais recentes primeiro
-        maint_data['logs'].insert(0, new_log_entry) 
-
-        if write_maintenance_data(maint_data):
+        
+        # Adicionar log de manutenção no banco de dados
+        user_id = current_user.id if current_user.is_authenticated else None
+        log = MaintenanceManager.add_maintenance_log(
+            task=task,
+            notes=notes,
+            user_id=user_id
+        )
+        
+        if log:
             return jsonify({"success": True, "message": "Log de manutenção registrado."})
         else:
-            return jsonify({"success": False, "error": "Falha ao salvar o log."}), 500
+            return jsonify({"success": False, "error": "Falha ao salvar o log no banco de dados."}), 500
 
     except Exception as e:
         print(f"Erro em /log_maintenance: {e}", flush=True)
@@ -751,30 +881,76 @@ def request_full_status(client):
     print(f"Enviando solicitação 'pushall' (seq: {sequence_id}) para {TOPIC_REQUEST}", flush=True)
     result = client.publish(TOPIC_REQUEST, payload_json)
     # print(f"Publish result: {result}") # Debug opcional
+    
+    # Solicitar informações da impressora
+    request_printer_info(client)
+
+def request_printer_info(client):
+    """Envia uma solicitação para obter informações da impressora, incluindo estatísticas."""
+    sequence_id = get_next_sequence_id()
+    request_payload = {
+        "info": {
+            "sequence_id": sequence_id,
+            "command": "get_version"
+        }
+    }
+    payload_json = json.dumps(request_payload)
+    print(f"Enviando solicitação 'get_version' (seq: {sequence_id}) para {TOPIC_REQUEST}", flush=True)
+    result = client.publish(TOPIC_REQUEST, payload_json)
+    
+    # Também podemos tentar obter outros tipos de informações que a impressora forneça
+    # Este é apenas um exemplo, pode ser expandido conforme necessário
+    sequence_id = get_next_sequence_id()
+    request_payload = {
+        "system": {
+            "sequence_id": sequence_id,
+            "command": "get_printer_info"
+        }
+    }
+    payload_json = json.dumps(request_payload)
+    print(f"Enviando solicitação 'get_printer_info' (seq: {sequence_id}) para {TOPIC_REQUEST}", flush=True)
+    client.publish(TOPIC_REQUEST, payload_json)
 
 def mqtt_thread_func():
-    """Função executada na thread MQTT para lidar com a conexão e loop."""
-    # Cria o cliente DENTRO da thread
-    local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, MQTT_CLIENT_ID)
-    local_client.on_connect = on_connect
-    local_client.on_message = on_message
-    local_client.on_disconnect = on_disconnect
-
-    local_client.username_pw_set(MQTT_USER, MQTT_PASS)
-    local_client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT, cert_reqs=ssl.CERT_NONE)
-    local_client.tls_insecure_set(True)
-
-    print(f"Thread MQTT: Tentando conectar a {PRINTER_IP}:{MQTT_PORT}...", flush=True)
+    """Função que executa em uma thread separada para gerenciar conexão MQTT."""
+    print("Thread MQTT iniciada", flush=True)
+    
+    # Pequeno atraso para garantir que o aplicativo esteja totalmente inicializado
+    time.sleep(2)
+    
+    # TLS é necessário para a Bambu Lab
     try:
-        # Conecta e entra no loop. on_connect definirá app.mqtt_client
-        local_client.connect(PRINTER_IP, MQTT_PORT, 60)
+        # Criar cliente MQTT local
+        local_client = mqtt.Client(client_id=MQTT_CLIENT_ID, protocol=mqtt.MQTTv311)
+        
+        # Configurar callbacks
+        local_client.on_connect = on_connect
+        local_client.on_disconnect = on_disconnect
+        local_client.on_message = on_message
+        
+        # TLS é necessário para a Bambu Lab
+        try:
+            local_client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT, cert_reqs=ssl.CERT_NONE)
+            local_client.tls_insecure_set(True)
+            print(f"Conectando ao broker MQTT: {PRINTER_IP}:{MQTT_PORT}", flush=True)
+            local_client.connect(PRINTER_IP, MQTT_PORT, 60)
+        except Exception as e:
+            print(f"Erro ao conectar ao broker MQTT: {e}", flush=True)
+            print("Thread MQTT terminando.", flush=True)
+            return
+    except Exception as e:
+        print(f"Erro ao iniciar thread MQTT: {e}", flush=True)
+        print("Thread MQTT terminando.", flush=True)
+        return
+
+    # Loop MQTT
+    try:
         local_client.loop_forever()
     except Exception as e:
-        print(f"Erro fatal na conexão/loop MQTT: {e}", flush=True)
-        app.mqtt_client = None # Garante que app.mqtt_client seja None em caso de falha no loop
+        print(f"Erro no loop MQTT: {e}", flush=True)
     finally:
-         print("Thread MQTT terminando.", flush=True)
-         app.mqtt_client = None # Garante limpeza ao sair do loop
+        print("Thread MQTT terminando.", flush=True)
+        app.mqtt_client = None # Garante limpeza ao sair do loop
 
 # --- Funções de Manutenção ---
 
@@ -809,6 +985,43 @@ def write_maintenance_data(data):
 
 # --- Inicialização ---
 
+# Inicializar a integração MQTT para atualização de estatísticas
+try:
+    from mqtt_integration import MQTTIntegration
+    
+    # Função de callback para atualizar o printer_status
+    def update_printer_status(data):
+        """
+        Atualiza o printer_status com os dados recebidos
+        
+        Args:
+            data (dict): Dados a serem atualizados no printer_status
+        """
+        global printer_status
+        with status_lock:
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    if key in printer_status and isinstance(printer_status.get(key), dict):
+                        printer_status[key].update(value)
+                    else:
+                        printer_status[key] = value
+                else:
+                    printer_status[key] = value
+    
+    app.mqtt_integration = MQTTIntegration({
+        'PRINTER_IP': PRINTER_IP,
+        'ACCESS_CODE': ACCESS_CODE,
+        'DEVICE_ID': DEVICE_ID
+    })
+    
+    # Configura o callback
+    app.mqtt_integration.set_update_callback(update_printer_status)
+    
+    print("Integração MQTT para estatísticas inicializada", flush=True)
+except Exception as e:
+    print(f"Erro ao inicializar integração MQTT para estatísticas: {e}", flush=True)
+    app.mqtt_integration = None
+
 if __name__ == '__main__':
     # Inicia a thread MQTT em background
     mqtt_thread = threading.Thread(target=mqtt_thread_func, daemon=True)
@@ -816,6 +1029,6 @@ if __name__ == '__main__':
 
     # Inicia o servidor Flask
     # Use host='0.0.0.0' para torná-lo acessível na sua rede local
-    print("Iniciando servidor Flask em http://0.0.0.0:5000")
+    print("Iniciando servidor Flask em http://0.0.0.0:5000", flush=True)
     # Use debug=False para produção ou para evitar logs excessivos de requisição
     app.run(host='0.0.0.0', port=5000, debug=False) 

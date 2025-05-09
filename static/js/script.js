@@ -117,10 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Elementos de Manutenção ---
     const totalHoursSpan = document.getElementById('total-hours');
     const totalPrintsSpan = document.getElementById('total-prints');
+    const powerOnHoursSpan = document.getElementById('power-on-hours');
     const totalsLastUpdatedSpan = document.getElementById('totals-last-updated');
-    const updateHoursInput = document.getElementById('update-hours-input');
-    const updatePrintsInput = document.getElementById('update-prints-input');
-    const updateTotalsButton = document.getElementById('update-totals-button');
     const totalsStatusDiv = document.getElementById('totals-status');
     const maintenanceTaskSelect = document.getElementById('maintenance-task');
     const maintenanceNotesTextarea = document.getElementById('maintenance-notes');
@@ -362,7 +360,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             const colorHexRaw = tray.cols?.[0] ?? '808080FF';
                             const colorHex = colorHexRaw.length >= 6 ? colorHexRaw : '808080FF';
                             const colorRgb = hexToRgb(colorHex);
-                            const remainingPercent = tray.remain !== undefined ? `${tray.remain}%` : '--';
+                            // Usando o valor em gramas se disponível, caso contrário mostra porcentagem
+                            const remainingWeightG = tray.remaining_g !== undefined && tray.remaining_g !== null 
+                                ? `${Number(tray.remaining_g).toFixed(0)}g` // Formatar como inteiro
+                                : (tray.remain !== undefined ? `${tray.remain}%` : '--');
                             const stgSubTypeDisplay = stgFilamentSubType ? ` (${stgFilamentSubType})` : '';
 
                             // Ler dados do DHT (assumindo que virão do backend)
@@ -376,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 <span class="filament-color" style="background-color: ${colorRgb};"></span>
                                                 <span class="value">${stgFilamentType}</span><span class="label">${stgSubTypeDisplay}</span>
                                             </p>
-                                            <p><span class="label">Restante:</span> <span class="value">${remainingPercent}</span></p>
+                                            <p><span class="label">Restante:</span> <span class="value">${remainingWeightG}</span></p>
                                             <p>
                                                 <span class="label">🌡️</span> <span class="value">${dhtTemp}</span>&nbsp;&nbsp;
                                                 <span class="label">💧</span> <span class="value">${dhtHumidity}</span>
@@ -409,7 +410,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     const colorHexRaw = tray.cols?.[0] ?? '808080FF';
                                     const colorHex = colorHexRaw.length >= 6 ? colorHexRaw : '808080FF';
                                     const colorRgb = hexToRgb(colorHex);
-                                    const remainingPercent = tray.remain !== undefined ? `${tray.remain}%` : '--';
+                                    // Usando o valor em gramas se disponível, caso contrário mostra porcentagem
+                                    const remainingWeightG = tray.remaining_g !== undefined && tray.remaining_g !== null 
+                                        ? `${Number(tray.remaining_g).toFixed(0)}g` // Formatar como inteiro
+                                        : (tray.remain !== undefined ? `${tray.remain}%` : '--');
                                     const subTypeDisplay = filamentSubType ? ` (${filamentSubType})` : '';
 
                                     // Ler dados do DHT (assumindo que virão do backend)
@@ -422,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     <span class="filament-color" style="background-color: ${colorRgb};"></span>
                                                     <span class="value">${filamentType}</span><span class="label">${subTypeDisplay}</span>
                                                 </p>
-                                                <p><span class="label">Restante:</span> <span class="value">${remainingPercent}</span></p>
+                                                <p><span class="label">Restante:</span> <span class="value">${remainingWeightG}</span></p>
                                                 <p>
                                                     <span class="label">🌡️</span> <span class="value">${dhtTemp}</span>&nbsp;&nbsp;
                                                     <span class="label">💧</span> <span class="value">${dhtHumidity}</span>
@@ -567,10 +571,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[DEBUG] updateTotalsDisplay chamada com:", totals);
         if (totalHoursSpan) totalHoursSpan.textContent = totals.hours?.toFixed(1) ?? 'N/A';
         if (totalPrintsSpan) totalPrintsSpan.textContent = totals.prints ?? 'N/A';
+        if (powerOnHoursSpan) powerOnHoursSpan.textContent = totals.power_on_hours?.toFixed(1) ?? 'N/A';
         if (totalsLastUpdatedSpan) totalsLastUpdatedSpan.textContent = totals.last_updated ?? 'Nunca';
-        // Preenche os inputs com os valores atuais para facilitar a atualização
-        if (updateHoursInput) updateHoursInput.value = totals.hours ?? '';
-        if (updatePrintsInput) updatePrintsInput.value = totals.prints ?? '';
+        // Não preenchemos mais inputs pois os campos foram removidos
     }
 
     function populateHistoryTable(logs) {
@@ -582,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
         historyTableBody.innerHTML = ''; // Limpa a tabela
 
         if (logs.length === 0) {
-            historyTableBody.innerHTML = '<tr><td colspan="5">Nenhum registro de manutenção encontrado.</td></tr>';
+            historyTableBody.innerHTML = '<tr><td colspan="6">Nenhum registro de manutenção encontrado.</td></tr>';
             return;
         }
 
@@ -592,6 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = log.task ?? '-';
             row.insertCell().textContent = log.hours_at_log?.toFixed(1) ?? '-';
             row.insertCell().textContent = log.prints_at_log ?? '-';
+            row.insertCell().textContent = log.user ?? '-';
             row.insertCell().textContent = log.notes ?? '-';
         });
     }
@@ -609,9 +613,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("[DEBUG] fetchMaintenanceData: Dados recebidos:", data);
                 if (data && data.totals) {
                     updateTotalsDisplay(data.totals);
+                } else {
+                    console.warn("[DEBUG] fetchMaintenanceData: Dados recebidos sem totais");
+                    // Limpar os campos se não houver dados
+                    updateTotalsDisplay({
+                        hours: 0,
+                        prints: 0,
+                        power_on_hours: 0,
+                        last_updated: 'Nunca'
+                    });
                 }
                 if (data && data.logs) {
                     populateHistoryTable(data.logs);
+                } else {
+                    console.warn("[DEBUG] fetchMaintenanceData: Dados recebidos sem logs");
+                    if (historyTableBody) {
+                        historyTableBody.innerHTML = '<tr><td colspan="6">Nenhum registro de manutenção encontrado.</td></tr>';
+                    }
                 }
             })
             .catch(error => {
@@ -620,9 +638,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     totalsStatusDiv.textContent = `Erro ao buscar dados: ${error.message}`;
                     totalsStatusDiv.className = 'status-error';
                 }
-                 if (historyTableBody) {
-                    historyTableBody.innerHTML = `<tr><td colspan="5">Erro ao carregar histórico: ${error.message}</td></tr>`;
-                 }
+                if (historyTableBody) {
+                    historyTableBody.innerHTML = `<tr><td colspan="6">Erro ao carregar histórico: ${error.message}</td></tr>`;
+                }
+                // Limpar os campos em caso de erro
+                updateTotalsDisplay({
+                    hours: '--',
+                    prints: '--',
+                    power_on_hours: '--',
+                    last_updated: 'Nunca'
+                });
             });
     }
 
@@ -775,39 +800,66 @@ document.addEventListener('DOMContentLoaded', () => {
     } else { console.warn("[DEBUG] Elementos de controle de Fan não encontrados."); }
 
     // --- Listeners de Manutenção ---
-    if (updateTotalsButton && updateHoursInput && updatePrintsInput && totalsStatusDiv) {
-        updateTotalsButton.addEventListener('click', () => {
-            const hours = parseFloat(updateHoursInput.value);
-            const prints = parseInt(updatePrintsInput.value, 10);
-            console.log(`[DEBUG] Botão 'Salvar Totais' clicado. Horas: ${hours}, Impressões: ${prints}`);
-
-            if (isNaN(hours) || hours < 0 || isNaN(prints) || prints < 0) {
-                totalsStatusDiv.textContent = 'Erro: Insira valores numéricos válidos para horas (>=0) e impressões (inteiro >=0).';
-                totalsStatusDiv.className = 'status-error';
-                return;
-            }
-
-            const payload = { hours: hours, prints: prints };
-            sendMaintenancePost('/update_totals', payload, totalsStatusDiv);
-        });
-    } else { console.warn("[DEBUG] Elementos de atualização de totais não encontrados."); }
-
     if (logMaintenanceButton && maintenanceTaskSelect && maintenanceNotesTextarea && logStatusDiv) {
         logMaintenanceButton.addEventListener('click', () => {
             const task = maintenanceTaskSelect.value;
-            const notes = maintenanceNotesTextarea.value.trim();
-            console.log(`[DEBUG] Botão 'Registrar Manutenção' clicado. Tarefa: ${task}, Notas: ${notes}`);
-
-            if (!task) { // Deve sempre ter um valor selecionado
-                 logStatusDiv.textContent = 'Erro: Selecione uma tarefa de manutenção.';
-                 logStatusDiv.className = 'status-error';
-                 return;
+            const notes = maintenanceNotesTextarea.value;
+            
+            if (!task) {
+                logStatusDiv.textContent = 'Erro: Selecione uma tarefa de manutenção.';
+                logStatusDiv.className = 'status-error';
+                return;
             }
-
-             const payload = { task: task, notes: notes };
-             sendMaintenancePost('/log_maintenance', payload, logStatusDiv);
+            
+            const maintenanceData = {
+                task: task,
+                notes: notes
+            };
+            
+            sendMaintenancePost('/log_maintenance', maintenanceData, logStatusDiv);
         });
-    } else { console.warn("[DEBUG] Elementos de log de manutenção não encontrados."); }
+    } else { console.warn("[DEBUG] Elementos de formulário de manutenção não encontrados"); }
+
+    // Botão de forçar atualização de estatísticas
+    const forceUpdateButton = document.getElementById('force-update-button');
+    if (forceUpdateButton && totalsStatusDiv) {
+        forceUpdateButton.addEventListener('click', () => {
+            console.log("[DEBUG] Botão de forçar atualização clicado");
+            totalsStatusDiv.textContent = 'Solicitando atualização...';
+            totalsStatusDiv.className = 'status-pending';
+            
+            fetch('/force_stats_update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                return response.json().then(data => ({ ok: response.ok, status: response.status, data }));
+            })
+            .then(({ ok, status, data }) => {
+                if (ok) {
+                    console.log("[DEBUG] Atualização forçada: Sucesso -", data);
+                    totalsStatusDiv.textContent = data.message || 'Solicitação enviada. Aguarde alguns segundos...';
+                    totalsStatusDiv.className = 'status-success';
+                    
+                    // Aguardar alguns segundos e buscar novamente os dados
+                    setTimeout(() => {
+                        fetchMaintenanceData();
+                    }, 5000);
+                } else {
+                    console.error("[DEBUG] Atualização forçada: Erro -", data);
+                    totalsStatusDiv.textContent = `Erro: ${data.error || 'Falha na solicitação.'} (Status: ${status})`;
+                    totalsStatusDiv.className = 'status-error';
+                }
+            })
+            .catch(error => {
+                console.error("[DEBUG] Atualização forçada: Erro de rede -", error);
+                totalsStatusDiv.textContent = `Erro de Rede: ${error.message}`;
+                totalsStatusDiv.className = 'status-error';
+            });
+        });
+    }
 
     const shareButton = document.getElementById('share-link-button');
     const shareToken = document.body.dataset.shareToken;

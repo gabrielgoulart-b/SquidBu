@@ -29,3 +29,11 @@ accessToken.json
 *.log
 flask_app.log
 tailscale_funnel.log
+
+# Banco de dados SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Relatório de implementação
+relatorio_implementacao.md
