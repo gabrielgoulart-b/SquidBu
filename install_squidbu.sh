@@ -69,22 +69,27 @@ REQUIRED_PKGS="python3 python3-pip python3-venv mosquitto git"
 if command -v dpkg >/dev/null 2>&1; then
     # Debian, Ubuntu, etc
     CHECK_PKG_CMD="dpkg -s"
-    INSTALL_CMD="apt-get update && apt-get install -y"
+    UPDATE_CMD="apt-get update"
+    INSTALL_CMD="apt-get install -y"
 elif command -v apt-get >/dev/null 2>&1; then
     # Outros sistemas baseados em Debian sem dpkg
     CHECK_PKG_CMD="apt-cache policy"
-    INSTALL_CMD="apt-get update && apt-get install -y"
+    UPDATE_CMD="apt-get update"
+    INSTALL_CMD="apt-get install -y"
 elif command -v pacman >/dev/null 2>&1; then
     # Arch Linux
     CHECK_PKG_CMD="pacman -Qi"
-    INSTALL_CMD="pacman -Sy --noconfirm"
+    UPDATE_CMD="pacman -Sy"
+    INSTALL_CMD="pacman -S --noconfirm"
 elif command -v dnf >/dev/null 2>&1; then
     # Fedora, CentOS, RHEL
     CHECK_PKG_CMD="rpm -q"
+    UPDATE_CMD="dnf check-update || true"
     INSTALL_CMD="dnf install -y"
 elif command -v yum >/dev/null 2>&1; then
     # Sistemas mais antigos Red Hat/CentOS
     CHECK_PKG_CMD="rpm -q"
+    UPDATE_CMD="yum check-update || true"
     INSTALL_CMD="yum install -y"
 else
     print_error "Sistema operacional não suportado ou gerenciador de pacotes não identificado."
@@ -96,8 +101,13 @@ else
     fi
     # Vamos prosseguir mesmo sem verificar/instalar pacotes
     CHECK_PKG_CMD="echo"
-    INSTALL_CMD="echo Ignorando instalação de:"
+    UPDATE_CMD="echo Ignorando atualização de repositórios"
+    INSTALL_CMD="echo Ignorando instalação de"
 fi
+
+# Atualizar os repositórios uma única vez antes de iniciar as instalações
+print_message "Atualizando repositórios de pacotes..."
+$UPDATE_CMD
 
 for pkg in $REQUIRED_PKGS; do
     if ! $CHECK_PKG_CMD "$pkg" >/dev/null 2>&1; then
