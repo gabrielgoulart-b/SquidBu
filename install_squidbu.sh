@@ -71,6 +71,18 @@ if command -v dpkg >/dev/null 2>&1; then
     CHECK_PKG_CMD="dpkg -s"
     UPDATE_CMD="apt-get update"
     INSTALL_CMD="apt-get install -y"
+    
+    # Verificar se é Ubuntu e adaptar comandos conforme necessário
+    if grep -q "Ubuntu" /etc/os-release 2>/dev/null; then
+        print_message "Detectado sistema Ubuntu."
+        # Em algumas versões do Ubuntu, pode ser necessário instalar python3-venv via python3.x-venv
+        # onde x é a versão específica do Python
+        if ! dpkg -s python3-venv >/dev/null 2>&1; then
+            PYTHON_VERSION_MAJOR_MINOR=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            print_message "Tentando instalar python${PYTHON_VERSION_MAJOR_MINOR}-venv como alternativa..."
+            apt-get install -y "python${PYTHON_VERSION_MAJOR_MINOR}-venv" || true
+        fi
+    fi
 elif command -v apt-get >/dev/null 2>&1; then
     # Outros sistemas baseados em Debian sem dpkg
     CHECK_PKG_CMD="apt-cache policy"
@@ -108,14 +120,49 @@ fi
 # Atualizar os repositórios uma única vez antes de iniciar as instalações
 print_message "Atualizando repositórios de pacotes..."
 $UPDATE_CMD
+if [ $? -ne 0 ]; then
+    print_warning "Houve um erro ao atualizar os repositórios, mas tentaremos prosseguir mesmo assim."
+fi
 
+# Instalar cada pacote individualmente para melhor tratamento de erros
 for pkg in $REQUIRED_PKGS; do
     if ! $CHECK_PKG_CMD "$pkg" >/dev/null 2>&1; then
         print_warning "Pacote $pkg não encontrado. Tentando instalar..."
         $INSTALL_CMD "$pkg"
         if [ $? -ne 0 ]; then
-            print_error "Falha ao instalar $pkg. Por favor, instale manualmente e tente novamente."
-            exit 1
+            if [ "$pkg" = "python3-venv" ]; then
+                print_warning "Falha ao instalar python3-venv. Tentando soluções alternativas..."
+                
+                # Para Ubuntu/Debian, tentar instalar a versão específica do Python
+                if command -v apt-get >/dev/null 2>&1; then
+                    PYTHON_VERSION_MAJOR_MINOR=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+                    print_message "Tentando instalar python${PYTHON_VERSION_MAJOR_MINOR}-venv..."
+                    apt-get install -y "python${PYTHON_VERSION_MAJOR_MINOR}-venv"
+                    if [ $? -eq 0 ]; then
+                        print_success "Instalou python${PYTHON_VERSION_MAJOR_MINOR}-venv como alternativa."
+                        continue
+                    fi
+                fi
+                
+                # Se ainda não conseguiu, tentar usar virtualenv como alternativa
+                print_message "Tentando usar virtualenv como alternativa..."
+                if ! command -v virtualenv >/dev/null 2>&1; then
+                    $INSTALL_CMD python3-virtualenv || $INSTALL_CMD virtualenv || pip3 install virtualenv
+                fi
+                
+                if command -v virtualenv >/dev/null 2>&1; then
+                    print_success "Virtualenv encontrado, será usado como alternativa ao venv."
+                    USE_VIRTUALENV=true
+                    continue
+                else
+                    print_error "Não foi possível instalar nenhuma alternativa para criar ambiente virtual Python."
+                    print_error "Por favor, instale python3-venv manualmente e tente novamente."
+                    exit 1
+                fi
+            else
+                print_error "Falha ao instalar $pkg. Por favor, instale manualmente e tente novamente."
+                exit 1
+            fi
         fi
     fi
 done
@@ -166,10 +213,27 @@ fi
 # Criar ambiente virtual Python
 print_message "Criando ambiente virtual Python..."
 cd "$INSTALL_DIR"
-python3 -m venv venv
+
+if [ "${USE_VIRTUALENV:-false}" = true ]; then
+    # Usar virtualenv se venv não estiver disponível
+    virtualenv venv
+else
+    # Método padrão com venv
+    python3 -m venv venv
+fi
+
 if [ $? -ne 0 ]; then
     print_error "Falha ao criar ambiente virtual Python."
-    exit 1
+    print_message "Tentando método alternativo..."
+    
+    # Tentar método alternativo
+    python3 -m pip install --user virtualenv
+    if command -v virtualenv >/dev/null 2>&1; then
+        virtualenv venv
+    else
+        print_error "Todos os métodos para criar um ambiente virtual falharam."
+        exit 1
+    fi
 fi
 
 # Instalar dependências Python
