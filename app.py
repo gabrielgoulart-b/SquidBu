@@ -210,6 +210,38 @@ def handle_command():
                     "param": gcode_line
                 }
             }
+        elif command == 'pause':
+            payload_to_send = {
+                "print": {
+                    "sequence_id": sequence_id,
+                    "command": "pause"
+                }
+            }
+        elif command == 'resume':
+            payload_to_send = {
+                "print": {
+                    "sequence_id": sequence_id,
+                    "command": "resume"
+                }
+            }
+        elif command == 'stop':
+            payload_to_send = {
+                "print": {
+                    "sequence_id": sequence_id,
+                    "command": "stop"
+                }
+            }
+        elif command == 'print_speed':
+            value = data.get('value')
+            if value not in ['1', '2', '3', '4']:
+                return jsonify({"success": False, "error": "Valor de velocidade inválido. Use '1', '2', '3' ou '4'."}), 400
+            payload_to_send = {
+                "print": {
+                    "sequence_id": sequence_id,
+                    "command": "print_speed",
+                    "param": value
+                }
+            }
         elif command == 'set_chamber_light':
             mode = data.get('mode') # Espera 'on' ou 'off'
             if mode not in ['on', 'off']:

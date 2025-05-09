@@ -307,10 +307,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Bloco Visão Geral
             if (overviewDiv) {
-                let printStage = printStatus.mc_print_stage || 'UNKNOWN';
-                // Traduzir estágios se necessário (opcional)
-                // const stageTranslations = { 'IDLE': 'Ocioso', 'PRINTING': 'Imprimindo', ... };
-                // printStage = stageTranslations[printStage] || printStage;
+                let printStage = printStatus.gcode_state || printStatus.mc_print_stage || 'UNKNOWN';
+                // Traduzir estágios para texto amigável
+                const stageTranslations = { 
+                    'IDLE': 'Ocioso', 
+                    'PREPARE': 'Preparando', 
+                    'PRINTING': 'Imprimindo', 
+                    'PAUSE': 'Pausado',
+                    'FINISH': 'Finalizado',
+                    'FAILED': 'Falha',
+                    'ABORT': 'Abortado',
+                    'UNKNOWN': 'Desconhecido'
+                };
+                printStage = stageTranslations[printStage] || printStage;
                 const printSpeedMap = { 1: 'Silencioso (50%)', 2: 'Padrão (100%)', 3: 'Sport (124%)', 4: 'Ludicrous (168%)' };
                 const printSpeed = printSpeedMap[printStatus.spd_lvl] || 'Desconhecido';
                 overviewHTML += `<div class="status-item"><strong>Estado</strong><span class="status-value">${printStage}</span></div>`;
@@ -688,9 +697,40 @@ document.addEventListener('DOMContentLoaded', () => {
     } else { console.error("[DEBUG] Botão de tema não encontrado!"); }
 
     // --- Controles Diretos (Pause, etc) ---
-    controlButtons.forEach(button => { /* ... (listener) ... */ });
+    controlButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const command = button.dataset.command; // 'pause', 'resume' ou 'stop'
+            if (!command) {
+                console.error("[DEBUG] Botão de controle sem comando definido:", button);
+                return;
+            }
+            
+            // Confirmação extra para stop
+            if (command === 'stop' && !confirm('Tem certeza que deseja parar a impressão? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            const payload = { command: command };
+            console.log("[DEBUG] Enviando comando:", command);
+            sendCommand(payload);
+        });
+    });
+    
     // --- Velocidade ---
-    if (setSpeedButton && speedSelect) { /* ... (listener) ... */ }
+    if (setSpeedButton && speedSelect) {
+        setSpeedButton.addEventListener('click', () => {
+            const value = speedSelect.value; // '1', '2', '3' ou '4'
+            if (!value) {
+                console.error("[DEBUG] Nenhum valor de velocidade selecionado");
+                return;
+            }
+            
+            const payload = { command: 'print_speed', value: value };
+            console.log("[DEBUG] Enviando comando de velocidade:", value);
+            sendCommand(payload);
+        });
+    } else { console.warn("[DEBUG] Elementos de controle de velocidade não encontrados."); }
+
     // --- LEDs ---
     ledButtons.forEach(button => {
         button.addEventListener('click', () => {
