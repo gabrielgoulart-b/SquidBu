@@ -19,6 +19,32 @@ SquidBu é um sistema de monitoramento para impressoras 3D Bambu Lab que permite
 
 ## Instalação
 
+### Método Automático (Recomendado)
+
+Use nosso script de instalação automática que configura todo o sistema, incluindo usuário e senha:
+
+```bash
+# Baixe o script de instalação
+wget https://raw.githubusercontent.com/gabrielgoulart-b/SquidBu/main/install_squidbu.sh
+
+# Dê permissão de execução
+chmod +x install_squidbu.sh
+
+# Execute o instalador (requer privilégios de superusuário)
+sudo ./install_squidbu.sh
+```
+
+O instalador irá:
+1. Verificar e instalar todas as dependências necessárias
+2. Configurar usuário e senha para acesso seguro
+3. Configurar conexão com sua impressora Bambu Lab
+4. Instalar e configurar o servidor MQTT para comunicação com ESP32
+5. Criar um serviço do sistema para inicialização automática
+
+### Instalação Manual
+
+Se preferir instalar manualmente:
+
 ```bash
 # Clone o repositório
 git clone https://github.com/gabrielgoulart-b/SquidBu.git
