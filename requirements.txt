@@ -3,4 +3,5 @@ paho-mqtt
 requests
 Flask-Login
 Flask-WTF
-pywebpush 
+pywebpush
+SQLAlchemy 
